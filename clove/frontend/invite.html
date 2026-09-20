@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CLOVE - You've Been Invited</title>
+  <link rel="stylesheet" href="css/style.css?v=1.2">
+  <style>
+    .invite-container {
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      background: linear-gradient(135deg, #f4f1ff, #f8fbff);
+    }
+    .invite-card {
+      width: min(440px, 100%);
+      background: #fff;
+      padding: 36px 32px;
+      border-radius: 20px;
+      box-shadow: 0 20px 60px rgba(38, 48, 74, 0.12);
+      text-align: center;
+      position: relative;
+    }
+    .invite-badge-icon {
+      width: 58px;
+      height: 58px;
+      border-radius: 18px;
+      background: #f0edff;
+      color: #5b46d8;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 28px;
+      margin: 0 auto 16px;
+    }
+    .invite-subtitle {
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #9aa1b1;
+      font-weight: 800;
+      margin-bottom: 6px;
+    }
+    .invite-title {
+      font-size: 24px;
+      font-weight: 800;
+      margin: 0 0 16px;
+      color: #172033;
+    }
+    .invite-details-box {
+      background: #f8f9fc;
+      border: 1px solid #e7e9ef;
+      border-radius: 14px;
+      padding: 18px;
+      margin: 22px 0;
+      text-align: left;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .invite-detail-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 14px;
+    }
+    .invite-detail-row .label {
+      color: #6b7280;
+      font-weight: 600;
+    }
+    .invite-detail-row .val {
+      font-weight: 700;
+      color: #172033;
+    }
+    .role-readonly-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 12px;
+      border-radius: 8px;
+      background: #e9e5ff;
+      color: #4f39c7;
+      font-weight: 800;
+      font-size: 13px;
+      letter-spacing: 0.03em;
+    }
+    .role-readonly-badge .lock-icon {
+      font-size: 11px;
+      opacity: 0.75;
+    }
+    .role-note {
+      font-size: 11px;
+      color: #9aa1b1;
+      text-align: right;
+      margin-top: -4px;
+    }
+    .auth-tab-row {
+      display: flex;
+      border-bottom: 1px solid #e7e9ef;
+      margin-bottom: 18px;
+    }
+    .auth-tab-btn {
+      flex: 1;
+      border: none;
+      background: transparent;
+      padding: 10px;
+      font-weight: 700;
+      font-size: 14px;
+      color: #6b7280;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: all 0.15s;
+    }
+    .auth-tab-btn.active {
+      color: #5b46d8;
+      border-bottom-color: #5b46d8;
+    }
+    .invite-auth-wrap {
+      text-align: left;
+      margin-top: 14px;
+    }
+    .invite-auth-wrap label {
+      margin: 12px 0;
+      font-size: 13px;
+    }
+    .invite-auth-wrap input {
+      margin-top: 6px;
+      padding: 10px 12px;
+      font-size: 14px;
+    }
+    .invite-auth-header {
+      text-align: center;
+      margin-bottom: 16px;
+    }
+    .invite-auth-header h3 {
+      margin: 0 0 4px;
+      font-size: 18px;
+    }
+    .invite-auth-header p {
+      margin: 0;
+      font-size: 13px;
+      color: #6b7280;
+    }
+    .error-text {
+      color: #c2410c;
+      font-size: 13px;
+      margin-top: 10px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body class="invite-container">
+  <div class="invite-card" id="cardRoot">
+    <div class="brand">CLOVE</div>
+    <div id="cardContent">
+      <div class="muted">Loading invitation details...</div>
+    </div>
+  </div>
+
+  <script src="js/api.js?v=1.2"></script>
+  <script>
+    const cardContent = document.getElementById("cardContent");
+    let currentInvite = null;
+    let inviteToken = "";
+
+    function esc(v) {
+      return String(v ?? "").replace(/[&<>"']/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
+    }
+
+    function getParam(name) {
+      const url = new URL(window.location.href);
+      return url.searchParams.get(name) || "";
+    }
+
+    async function init() {
+      // Get token from query or URL
+      inviteToken = getParam("token");
+      if (!inviteToken) {
+        const parts = window.location.pathname.split("/").filter(Boolean);
+        if (parts.length >= 2 && parts[parts.length - 2] === "invite") {
+          inviteToken = parts[parts.length - 1];
+        }
+      }
+
+      if (!inviteToken) {
+        showError("Invalid invitation link. No invitation token was provided.");
+        return;
+      }
+
+      localStorage.setItem("clove_pending_invite", inviteToken);
+
+      try {
+        currentInvite = await api(`/invitations/${encodeURIComponent(inviteToken)}`);
+        renderInviteDetails();
+      } catch (err) {
+        showError(err.message || "Invitation is invalid or has expired.");
+      }
+    }
+
+    // Step 1: Render invitation details matching the user's diagram
+    function renderInviteDetails() {
+      const teamName = currentInvite.team_name || "My Team";
+      const projectName = currentInvite.project_name || "CLOVE";
+      const roleName = (currentInvite.role || "member").charAt(0).toUpperCase() + (currentInvite.role || "member").slice(1);
+
+      const currentUserStr = localStorage.getItem("clove_user");
+      const authToken = localStorage.getItem("clove_token");
+      const currentUser = currentUserStr && authToken ? JSON.parse(currentUserStr) : null;
+
+      let memberFooter = "";
+      if (currentUser) {
+        memberFooter = `
+          <p class="muted center" style="font-size:13px;margin-top:16px">
+            Logged in as <strong>${esc(currentUser.name)}</strong> · <a href="#" id="switchAccountLink">Switch account</a>
+          </p>
+        `;
+      } else {
+        memberFooter = `
+          <div style="margin-top:18px;display:flex;justify-content:center;gap:12px;font-size:13px" class="muted">
+            <a href="#" id="createAccountDirectLink" style="font-weight:600">Create new account</a>
+            <span>•</span>
+            <a href="#" id="alreadyMemberLink" style="font-weight:600">Log in to existing</a>
+          </div>
+        `;
+      }
+
+      cardContent.innerHTML = `
+        <div class="invite-badge-icon">✉️</div>
+        <div class="invite-subtitle">You've been invited</div>
+        <h1 class="invite-title">${esc(teamName)}</h1>
+
+        <div class="invite-details-box">
+          <div class="invite-detail-row">
+            <span class="label">Project</span>
+            <span class="val">${esc(projectName)}</span>
+          </div>
+          <div class="invite-detail-row">
+            <span class="label">Role</span>
+            <span class="role-readonly-badge" title="Selected by Admin. You cannot modify this role.">
+              ${esc(roleName)} <span class="lock-icon">🔒</span>
+            </span>
+          </div>
+          <div class="role-note">Assigned by Admin (read-only)</div>
+          ${currentInvite.inviter_name ? `
+            <div class="invite-detail-row" style="margin-top:4px;border-top:1px dashed #e7e9ef;padding-top:8px">
+              <span class="label">Invited by Admin</span>
+              <span class="val">${esc(currentInvite.inviter_name)}</span>
+            </div>
+          ` : ''}
+        </div>
+
+        <button class="primary full" id="acceptInviteBtn" style="font-size:15px;padding:14px">
+          Accept Invitation
+        </button>
+
+        ${memberFooter}
+        <div id="actionMsg" class="error-text"></div>
+      `;
+
+      document.getElementById("acceptInviteBtn").onclick = handleAcceptClick;
+
+      const alreadyMemberLink = document.getElementById("alreadyMemberLink");
+      if (alreadyMemberLink) {
+        alreadyMemberLink.onclick = (e) => {
+          e.preventDefault();
+          showAuthFlow("login");
+        };
+      }
+
+      const createDirectLink = document.getElementById("createAccountDirectLink");
+      if (createDirectLink) {
+        createDirectLink.onclick = (e) => {
+          e.preventDefault();
+          showAuthFlow("signup");
+        };
+      }
+
+      const switchAccountLink = document.getElementById("switchAccountLink");
+      if (switchAccountLink) {
+        switchAccountLink.onclick = (e) => {
+          e.preventDefault();
+          localStorage.removeItem("clove_token");
+          localStorage.removeItem("clove_user");
+          renderInviteDetails();
+        };
+      }
+    }
+
+    // Step 2: Handle Accept Invitation Click
+    async function handleAcceptClick() {
+      const currentUserStr = localStorage.getItem("clove_user");
+      const authToken = localStorage.getItem("clove_token");
+      const currentUser = currentUserStr && authToken ? JSON.parse(currentUserStr) : null;
+
+      if (currentUser) {
+        // User is logged in: complete acceptance immediately
+        await executeAcceptance();
+      } else {
+        // User not logged in: allow them to create account or log in
+        showAuthFlow("signup");
+      }
+    }
+
+    // Show Auth step with Create Account or Log In tabs
+    function showAuthFlow(defaultTab = "signup") {
+      const roleName = (currentInvite.role || "member").toUpperCase();
+
+      cardContent.innerHTML = `
+        <div class="invite-auth-header">
+          <h3>Accept Invitation</h3>
+          <p>Join as <strong style="color:#5b46d8">${esc(roleName)}</strong> in <strong>${esc(currentInvite.project_name || currentInvite.team_name || "CLOVE")}</strong></p>
+        </div>
+
+        <div class="auth-tab-row">
+          <button class="auth-tab-btn ${defaultTab === 'signup' ? 'active' : ''}" id="tabSignup">Create Account</button>
+          <button class="auth-tab-btn ${defaultTab === 'login' ? 'active' : ''}" id="tabLogin">Log In</button>
+        </div>
+
+        <div class="invite-auth-wrap" id="authFormArea"></div>
+        <div id="authErrorMsg" class="error-text"></div>
+
+        <p class="center" style="margin-top:14px;font-size:12px">
+          <a href="#" id="backToInviteLink">← Back to invitation details</a>
+        </p>
+      `;
+
+      document.getElementById("tabSignup").onclick = () => renderSignupForm();
+      document.getElementById("tabLogin").onclick = () => renderLoginForm();
+      document.getElementById("backToInviteLink").onclick = (e) => {
+        e.preventDefault();
+        renderInviteDetails();
+      };
+
+      if (defaultTab === "signup") {
+        renderSignupForm();
+      } else {
+        renderLoginForm();
+      }
+    }
+
+    function renderSignupForm() {
+      document.getElementById("tabSignup").classList.add("active");
+      document.getElementById("tabLogin").classList.remove("active");
+      const area = document.getElementById("authFormArea");
+      document.getElementById("authErrorMsg").textContent = "";
+
+      area.innerHTML = `
+        <form id="inviteSignupForm">
+          <label>Full Name
+            <input type="text" id="suName" required minlength="2" placeholder="e.g. Alex Johnson">
+          </label>
+          <label>Email Address
+            <input type="email" id="suEmail" required placeholder="you@example.com">
+          </label>
+          <label>Password
+            <input type="password" id="suPass" required minlength="6" placeholder="At least 6 characters">
+          </label>
+          <button class="primary full" type="submit" id="suSubmitBtn" style="margin-top:16px;padding:12px">
+            Create Account & Join
+          </button>
+        </form>
+      `;
+
+      document.getElementById("inviteSignupForm").onsubmit = async (e) => {
+        e.preventDefault();
+        const submitBtn = document.getElementById("suSubmitBtn");
+        const errBox = document.getElementById("authErrorMsg");
+        submitBtn.disabled = true;
+        submitBtn.textContent = "Creating account...";
+        errBox.textContent = "";
+
+        try {
+          const name = document.getElementById("suName").value;
+          const email = document.getElementById("suEmail").value;
+          const password = document.getElementById("suPass").value;
+
+          // 1. Sign up
+          await api("/auth/signup", {
+            method: "POST",
+            body: JSON.stringify({ name, email, password })
+          });
+
+          // 2. Log in automatically
+          const loginData = await api("/auth/login", {
+            method: "POST",
+            body: JSON.stringify({ email, password })
+          });
+
+          localStorage.setItem("clove_token", loginData.access_token);
+          localStorage.setItem("clove_user", JSON.stringify(loginData.user));
+
+          // 3. Automatically accept the invite
+          submitBtn.textContent = "Joining team...";
+          await executeAcceptance();
+
+        } catch (err) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = "Create Account & Join";
+          errBox.textContent = err.message || "Failed to create account.";
+        }
+      };
+    }
+
+    function renderLoginForm() {
+      document.getElementById("tabSignup").classList.remove("active");
+      document.getElementById("tabLogin").classList.add("active");
+      const area = document.getElementById("authFormArea");
+      document.getElementById("authErrorMsg").textContent = "";
+
+      area.innerHTML = `
+        <form id="inviteLoginForm">
+          <label>Email Address
+            <input type="email" id="liEmail" required placeholder="you@example.com">
+          </label>
+          <label>Password
+            <input type="password" id="liPass" required placeholder="Your password">
+          </label>
+          <button class="primary full" type="submit" id="liSubmitBtn" style="margin-top:16px;padding:12px">
+            Log In & Join
+          </button>
+        </form>
+      `;
+
+      document.getElementById("inviteLoginForm").onsubmit = async (e) => {
+        e.preventDefault();
+        const submitBtn = document.getElementById("liSubmitBtn");
+        const errBox = document.getElementById("authErrorMsg");
+        submitBtn.disabled = true;
+        submitBtn.textContent = "Logging in...";
+        errBox.textContent = "";
+
+        try {
+          const email = document.getElementById("liEmail").value;
+          const password = document.getElementById("liPass").value;
+
+          const loginData = await api("/auth/login", {
+            method: "POST",
+            body: JSON.stringify({ email, password })
+          });
+
+          localStorage.setItem("clove_token", loginData.access_token);
+          localStorage.setItem("clove_user", JSON.stringify(loginData.user));
+
+          // Automatically accept the invite
+          submitBtn.textContent = "Joining team...";
+          await executeAcceptance();
+
+        } catch (err) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = "Log In & Join";
+          errBox.textContent = err.message || "Failed to log in.";
+        }
+      };
+    }
+
+    // Step 3: Execute acceptance on the backend with stored bearer token
+    async function executeAcceptance() {
+      try {
+        const result = await api(`/invitations/${encodeURIComponent(inviteToken)}/accept`, {
+          method: "POST",
+          body: JSON.stringify({})
+        });
+
+        localStorage.removeItem("clove_pending_invite");
+
+        // Update stored user's role
+        const storedUser = JSON.parse(localStorage.getItem("clove_user") || "{}");
+        if (result.role) {
+          storedUser.role = result.role;
+          localStorage.setItem("clove_user", JSON.stringify(storedUser));
+        }
+
+        const assignedRole = (result.role || "member").toUpperCase();
+        const projName = currentInvite.project_name || currentInvite.team_name || "the workspace";
+
+        cardContent.innerHTML = `
+          <div class="invite-badge-icon" style="background:#e6f9ed;color:#15803d">✓</div>
+          <div class="invite-subtitle" style="color:#15803d">Invitation Accepted!</div>
+          <h1 class="invite-title">Welcome to the team</h1>
+          <p class="muted" style="margin-bottom:20px">
+            You have joined <strong>${esc(projName)}</strong> with the assigned role:
+            <br>
+            <span class="role-readonly-badge" style="margin-top:10px">${esc(assignedRole)}</span>
+          </p>
+          <button class="primary full" id="goWorkspaceBtn">Open Workspace</button>
+        `;
+
+        if (result.project_id) {
+          localStorage.setItem("clove_open_project", result.project_id);
+        }
+
+        document.getElementById("goWorkspaceBtn").onclick = () => {
+          location.href = "index.html";
+        };
+
+        setTimeout(() => {
+          location.href = "index.html";
+        }, 1500);
+
+      } catch (err) {
+        const errBox = document.getElementById("authErrorMsg") || document.getElementById("actionMsg");
+        if (errBox) {
+          errBox.textContent = err.message || "Could not accept invitation.";
+        } else {
+          alert(err.message || "Could not accept invitation.");
+        }
+      }
+    }
+
+    function showError(msg) {
+      cardContent.innerHTML = `
+        <div class="invite-badge-icon" style="background:#fde2df;color:#a3123a">✕</div>
+        <h1 class="invite-title">Invitation Unavailable</h1>
+        <div class="error-text" style="margin:16px 0">${esc(msg)}</div>
+        <div style="margin-top:24px">
+          <a href="index.html" class="primary full" style="display:block;text-align:center">Go to CLOVE</a>
+        </div>
+      `;
+    }
+
+    init();
+  </script>
+</body>
+</html>

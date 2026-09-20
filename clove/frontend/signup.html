@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>CLOVE Signup</title><link rel="stylesheet" href="css/style.css"></head>
+<body class="auth-page">
+  <div class="auth-card">
+    <div class="brand">CLOVE</div>
+    <h1>Create account</h1><p class="muted">Start managing your work.</p>
+    <form id="signupForm">
+      <label>Name<input id="name" required minlength="2"></label>
+      <label>Email<input id="email" type="email" required></label>
+      <label>Password<input id="password" type="password" required minlength="6"></label>
+      <button class="primary full" type="submit">Sign up</button>
+    </form>
+    <p id="message" class="message"></p>
+    <p class="muted center">Already have an account? <a href="login.html">Login</a></p>
+  </div>
+  <script src="js/api.js?v=1.2"></script><script src="js/auth.js?v=1.2"></script>
+</body></html>
