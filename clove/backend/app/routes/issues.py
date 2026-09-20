@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
+from pymongo import ReturnDocument
 
 from ..database import issues_collection, notifications_collection, projects_collection, users_collection
 from ..dependencies import current_user
@@ -34,6 +35,29 @@ def serialize(x):
         x["reporter_id"] = str(x["reporter_id"])
     if x.get("assignee_id"):
         x["assignee_id"] = str(x["assignee_id"])
+
+    # Ensure sequential number and issue key (e.g. PROJECTKEY-1, PROJECTKEY-2)
+    if "number" not in x or not x.get("key"):
+        try:
+            proj = projects_collection.find_one({"_id": ObjectId(x["project_id"])})
+            proj_key = (proj.get("key") if proj else None) or "ISS"
+            q = {"project_id": ObjectId(x["project_id"])}
+            if "created_at" in x and x["created_at"]:
+                q["created_at"] = {"$lte": x["created_at"]}
+            else:
+                q["_id"] = {"$lte": ObjectId(x["id"])}
+            cnt = issues_collection.count_documents(q)
+            num = cnt if cnt > 0 else 1
+            x["number"] = num
+            x["key"] = f"{proj_key}-{num}"
+            issues_collection.update_one(
+                {"_id": ObjectId(x["id"])},
+                {"$set": {"number": num, "key": x["key"]}}
+            )
+        except Exception:
+            x.setdefault("number", 1)
+            x.setdefault("key", f"ISS-{x.get('number', 1)}")
+
     return x
 
 
@@ -59,7 +83,7 @@ def check_project_permission(project_id: str, user: dict, action: str = "write")
     Validates that the user has permission to view/modify issues in the project.
     - Admin: unrestricted access to all projects
     - Project Owner: unrestricted access to own project
-    - Project Member / Workspace User: collaboration access to read, create, update status, and assign tasks
+    - Project Member: access to project they belong to
     """
     try:
         p_oid = ObjectId(project_id)
@@ -81,20 +105,16 @@ def check_project_permission(project_id: str, user: dict, action: str = "write")
     if str(project.get("owner_id", "")) == user_id:
         return project
 
-    # If the project has an explicit member restriction list
-    members = [str(m) for m in project.get("members", [])]
-    if members and user_id in members:
+    # If the user is in project's members list
+    raw_members = project.get("members", [])
+    member_ids = [str(m.get("user_id") if isinstance(m, dict) else m) for m in raw_members]
+    if user_id in member_ids:
         return project
 
-    # In CLOVE workspace, authenticated workspace members collaborate on team projects
-    # If project is restricted to explicit members and user is not in it:
-    if members and user_id not in members and user_role not in ("admin", "developer"):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Permission denied. You are not a member of this project.",
-        )
-
-    return project
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Permission denied. You are not a member of this project.",
+    )
 
 
 def normalize_status(raw_status: str | None) -> str:
@@ -109,7 +129,7 @@ def normalize_status(raw_status: str | None) -> str:
     return normalized
 
 
-VALID_PRIORITIES = {"Low", "Medium", "High", "Critical"}
+VALID_PRIORITIES = {"Lowest", "Low", "Medium", "High", "Highest", "Critical"}
 
 
 def validate_due_date(due_date_str: str | None) -> str:
@@ -129,16 +149,16 @@ def validate_due_date(due_date_str: str | None) -> str:
     return parsed_date.strftime("%Y-%m-%d")
 
 
-def validate_estimation(est) -> float | int:
+def validate_estimation(est) -> int:
     if est is None or est == "":
         raise HTTPException(status_code=400, detail="Estimation (Days) is required.")
     try:
         val = float(est)
     except (ValueError, TypeError):
-        raise HTTPException(status_code=400, detail="Estimation (Days) must be a positive number.")
+        raise HTTPException(status_code=400, detail="Estimation (Days) must be a positive whole number.")
     if val <= 0:
-        raise HTTPException(status_code=400, detail="Estimation (Days) must be a positive number (e.g. 1, 2, 3.5).")
-    return int(val) if val.is_integer() else val
+        raise HTTPException(status_code=400, detail="Estimation (Days) must be a positive whole number of days.")
+    return int(round(val))
 
 
 @router.post("")
@@ -155,7 +175,7 @@ async def create_issue(data: IssueCreate, user=Depends(current_user)):
     if not data.priority or data.priority not in VALID_PRIORITIES:
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid priority '{data.priority}'. Must be Low, Medium, High, or Critical.",
+            detail=f"Invalid priority '{data.priority}'. Must be Lowest, Low, Medium, High, Highest, or Critical.",
         )
 
     final_due_date = validate_due_date(data.due_date)
@@ -170,11 +190,31 @@ async def create_issue(data: IssueCreate, user=Depends(current_user)):
                 raise HTTPException(status_code=400, detail="Assignee user not found")
         except Exception:
             raise HTTPException(status_code=400, detail="Invalid assignee id")
+    proj_oid = ObjectId(data.project_id)
+    proj = projects_collection.find_one_and_update(
+        {"_id": proj_oid},
+        {"$inc": {"issue_counter": 1}},
+        return_document=ReturnDocument.AFTER
+    )
+    if not proj or "issue_counter" not in proj:
+        current_count = issues_collection.count_documents({"project_id": proj_oid})
+        next_number = current_count + 1
+        projects_collection.update_one(
+            {"_id": proj_oid},
+            {"$set": {"issue_counter": next_number}}
+        )
+        proj = projects_collection.find_one({"_id": proj_oid})
+        issue_number = next_number
     else:
-        assignee_id = None
+        issue_number = proj["issue_counter"]
+
+    proj_key = (proj.get("key") if proj else None) or "ISS"
+    issue_key_str = f"{proj_key}-{issue_number}"
 
     doc = {
-        "project_id": ObjectId(data.project_id),
+        "project_id": proj_oid,
+        "number": issue_number,
+        "key": issue_key_str,
         "title": data.title.strip(),
         "description": data.description.strip(),
         "status": final_status,
@@ -220,10 +260,28 @@ def list_issues(
 ):
     query = {}
     if project_id:
+        check_project_permission(project_id, user, action="read")
         try:
             query["project_id"] = ObjectId(project_id)
         except Exception:
             return []
+    else:
+        user_id = str(user["_id"])
+        user_oids = [ObjectId(user_id)] if ObjectId.is_valid(user_id) else []
+        user_match_ids = [user_id] + user_oids
+        accessible_filter = {
+            "$or": [
+                {"owner_id": {"$in": user_match_ids}},
+                {"members": {"$in": user_match_ids}},
+                {"members.user_id": {"$in": user_match_ids}},
+            ]
+        }
+        accessible_proj_ids = [p["_id"] for p in projects_collection.find(accessible_filter, {"_id": 1})]
+        if not accessible_proj_ids and user.get("role") != "admin":
+            return []
+        if user.get("role") != "admin":
+            query["project_id"] = {"$in": accessible_proj_ids}
+
     if status:
         query["status"] = normalize_status(status)
     if priority:
@@ -299,7 +357,7 @@ async def update_issue(issue_id: str, data: IssueUpdate, user=Depends(current_us
         if changes["priority"] not in VALID_PRIORITIES:
             raise HTTPException(
                 status_code=400,
-                detail=f"Invalid priority '{changes['priority']}'. Must be Low, Medium, High, or Critical.",
+                detail=f"Invalid priority '{changes['priority']}'. Must be Lowest, Low, Medium, High, Highest, or Critical.",
             )
 
     if "due_date" in changes:
@@ -403,9 +461,29 @@ async def complete_sprint(project_id: str, user=Depends(current_user)):
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid project id")
 
-    result = issues_collection.update_many(
-        {"project_id": oid, "status": "Done", "archived": {"$ne": True}},
-        {"$set": {"archived": True, "updated_at": datetime.now(timezone.utc)}},
+    proj = projects_collection.find_one({"_id": oid})
+    if not proj:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    is_currently_completed = bool(proj.get("completed", False))
+    new_completed_state = not is_currently_completed
+
+    if new_completed_state:
+        result = issues_collection.update_many(
+            {"project_id": oid, "status": "Done", "archived": {"$ne": True}},
+            {"$set": {"archived": True, "updated_at": datetime.now(timezone.utc)}},
+        )
+        archived_count = result.modified_count
+    else:
+        archived_count = 0
+
+    projects_collection.update_one(
+        {"_id": oid},
+        {"$set": {
+            "completed": new_completed_state,
+            "completed_at": datetime.now(timezone.utc) if new_completed_state else None,
+            "updated_at": datetime.now(timezone.utc),
+        }}
     )
 
     await ws_manager.broadcast_to_project(
@@ -413,9 +491,14 @@ async def complete_sprint(project_id: str, user=Depends(current_user)):
         {
             "type": "sprint_completed",
             "project_id": project_id,
-            "archived_count": result.modified_count,
+            "archived_count": archived_count,
+            "completed": new_completed_state,
             "actor_id": user["_id"],
         },
     )
 
-    return {"archived_count": result.modified_count}
+    return {
+        "message": "Sprint completed" if new_completed_state else "Sprint reopened",
+        "archived_count": archived_count,
+        "completed": new_completed_state,
+    }

@@ -1,5 +1,9 @@
 const API_BASE = "http://127.0.0.1:8000";
 
+window.byId = window.byId || function(id) {
+  return document.getElementById(id);
+};
+
 async function api(path, options = {}) {
   const headers = {"Content-Type": "application/json", ...(options.headers || {})};
   const token = localStorage.getItem("clove_token");

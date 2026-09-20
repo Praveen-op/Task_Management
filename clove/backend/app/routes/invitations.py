@@ -56,17 +56,12 @@ def create_invitation(data: InvitationCreate, user=Depends(current_user)):
 
     # Strict Permission Check: Only Admin users can invite new users
     user_role = (user.get("role") or "member").strip().lower()
-
-    # If the workspace does not yet have any Admin, automatically bootstrap the current user as Admin
-    if not users_collection.find_one({"role": "admin"}):
-        users_collection.update_one({"_id": ObjectId(user["_id"])}, {"$set": {"role": "admin"}})
-        user["role"] = "admin"
-        user_role = "admin"
+    team_id = user.get("team_id") or str(user["_id"])
 
     if user_role != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Permission denied. Only Admin users can invite new users.",
+            detail="Permission denied. Only Admin users can invite new users to this team.",
         )
 
     token = secrets.token_urlsafe(32)
@@ -75,9 +70,9 @@ def create_invitation(data: InvitationCreate, user=Depends(current_user)):
 
     doc = {
         "token": token,
-        "team_id": data.team_id or "default",
+        "team_id": team_id,
         "project_id": str(project["_id"]) if project else (data.project_id if data.project_id else None),
-        "created_by": user["_id"],
+        "created_by": str(user["_id"]),
         "role": role,
         "status": "pending",
         "created_at": now,
@@ -175,15 +170,13 @@ def accept_invitation(token: str, user=Depends(current_user)):
 
     assigned_role = inv["role"]
 
-    # Role updates: Update user role in users collection if invited as developer or admin, or if user is member
+    # Add user to the inviter's team and assign invited role
     user_id = user["_id"]
-    current_role = user.get("role", "member")
-    role_priority = {"member": 1, "developer": 2, "admin": 3}
-    if role_priority.get(assigned_role, 1) >= role_priority.get(current_role, 1):
-        users_collection.update_one(
-            {"_id": ObjectId(user_id)},
-            {"$set": {"role": assigned_role}},
-        )
+    target_team_id = inv.get("team_id") or str(inv.get("created_by", ""))
+    users_collection.update_one(
+        {"_id": ObjectId(user_id)},
+        {"$set": {"role": assigned_role, "team_id": target_team_id}},
+    )
 
     # If associated with a project, ensure user is registered to the project members
     project_id = inv.get("project_id")

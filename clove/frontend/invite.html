@@ -3,22 +3,28 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CLOVE - You've Been Invited</title>
-  <link rel="stylesheet" href="css/style.css?v=1.2">
+  <title>CLOVE</title>
+  <link rel="icon" type="image/svg+xml" href="image/files/clove-orange-icon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script>(function(){const t=localStorage.getItem("clove_theme")||(window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light");document.documentElement.setAttribute("data-theme",t);})();</script>
+  <link rel="stylesheet" href="css/style.css?v=3.4">
   <style>
     .invite-container {
       min-height: 100vh;
       display: grid;
       place-items: center;
       padding: 24px;
-      background: linear-gradient(135deg, #f4f1ff, #f8fbff);
+      background: var(--bg-body);
     }
     .invite-card {
       width: min(440px, 100%);
-      background: #fff;
+      background: var(--bg-surface);
       padding: 36px 32px;
-      border-radius: 20px;
-      box-shadow: 0 20px 60px rgba(38, 48, 74, 0.12);
+      border-radius: var(--radius-xl);
+      border: 1px solid var(--border-default);
+      box-shadow: var(--shadow-xl);
       text-align: center;
       position: relative;
     }
@@ -139,26 +145,30 @@
     }
     .invite-auth-header p {
       margin: 0;
-      font-size: 13px;
-      color: #6b7280;
+      font-size: var(--font-sm);
+      color: var(--text-muted);
     }
     .error-text {
-      color: #c2410c;
-      font-size: 13px;
+      color: var(--status-error);
+      font-size: var(--font-sm);
       margin-top: 10px;
       text-align: center;
+      font-weight: 600;
     }
   </style>
 </head>
 <body class="invite-container">
   <div class="invite-card" id="cardRoot">
-    <div class="brand">CLOVE</div>
+    <div class="auth-brand-row" style="justify-content:center;margin-bottom:16px;">
+      <img src="image/files/clove-orange-icon.svg" width="40" height="40" alt="Clove" style="border-radius:10px;">
+      <span class="brand">clove</span>
+    </div>
     <div id="cardContent">
       <div class="muted">Loading invitation details...</div>
     </div>
   </div>
 
-  <script src="js/api.js?v=1.2"></script>
+  <script src="js/api.js?v=3.0"></script>
   <script>
     const cardContent = document.getElementById("cardContent");
     let currentInvite = null;
@@ -238,7 +248,7 @@
           <div class="invite-detail-row">
             <span class="label">Role</span>
             <span class="role-readonly-badge" title="Selected by Admin. You cannot modify this role.">
-              ${esc(roleName)} <span class="lock-icon">🔒</span>
+              ${esc(roleName)} <span class="lock-icon"><img src="image/lock.svg" style="width:12px;height:12px;vertical-align:-1px;display:inline-block;" alt="Locked"></span>
             </span>
           </div>
           <div class="role-note">Assigned by Admin (read-only)</div>
@@ -348,7 +358,7 @@
       area.innerHTML = `
         <form id="inviteSignupForm">
           <label>Full Name
-            <input type="text" id="suName" required minlength="2" placeholder="e.g. Alex Johnson">
+            <input type="text" id="suName" required minlength="2" placeholder="Enter your name">
           </label>
           <label>Email Address
             <input type="email" id="suEmail" required placeholder="you@example.com">
@@ -475,7 +485,7 @@
         const projName = currentInvite.project_name || currentInvite.team_name || "the workspace";
 
         cardContent.innerHTML = `
-          <div class="invite-badge-icon" style="background:#e6f9ed;color:#15803d">✓</div>
+          <div class="invite-badge-icon" style="background:#e6f9ed;color:#15803d;display:flex;align-items:center;justify-content:center;"><img src="image/check-circle.svg" style="width:28px;height:28px;filter:invert(38%) sepia(85%) saturate(548%) hue-rotate(94deg) brightness(94%) contrast(92%);" alt="✓"></div>
           <div class="invite-subtitle" style="color:#15803d">Invitation Accepted!</div>
           <h1 class="invite-title">Welcome to the team</h1>
           <p class="muted" style="margin-bottom:20px">

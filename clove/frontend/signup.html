@@ -1,17 +1,40 @@
 <!DOCTYPE html>
-<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>CLOVE Signup</title><link rel="stylesheet" href="css/style.css"></head>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CLOVE</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/svg+xml" href="image/files/clove-orange-icon.svg">
+  <script>(function(){const t=localStorage.getItem("clove_theme")||(window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light");document.documentElement.setAttribute("data-theme",t);})();</script>
+  <link rel="stylesheet" href="css/style.css?v=3.8">
+</head>
 <body class="auth-page">
   <div class="auth-card">
-    <div class="brand">CLOVE</div>
-    <h1>Create account</h1><p class="muted">Start managing your work.</p>
+    <div class="auth-brand-row">
+      <img src="image/files/clove-orange-icon.svg" width="40" height="40" alt="Clove" style="border-radius:10px;">
+      <div class="brand">clove</div>
+    </div>
+    <h1>Create an account</h1>
+    <p class="muted">Start tracking and collaborating with your team</p>
     <form id="signupForm">
-      <label>Name<input id="name" required minlength="2"></label>
-      <label>Email<input id="email" type="email" required></label>
-      <label>Password<input id="password" type="password" required minlength="6"></label>
-      <button class="primary full" type="submit">Sign up</button>
+      <label>Full Name
+        <input id="name" required minlength="2" placeholder="Jane Doe" autocomplete="name">
+      </label>
+      <label>Work Email
+        <input id="email" type="email" required placeholder="jane@company.com" autocomplete="email">
+      </label>
+      <label>Password
+        <input id="password" type="password" required minlength="6" placeholder="At least 6 characters" autocomplete="new-password">
+      </label>
+      <button class="primary full" type="submit">Create account</button>
     </form>
     <p id="message" class="message"></p>
-    <p class="muted center">Already have an account? <a href="login.html">Login</a></p>
+    <p class="muted center auth-switch">Already have an account? <a href="login.html">Sign in</a></p>
   </div>
-  <script src="js/api.js?v=1.2"></script><script src="js/auth.js?v=1.2"></script>
-</body></html>
+  <script src="js/api.js?v=3.8"></script>
+  <script src="js/auth.js?v=3.8"></script>
+</body>
+</html>

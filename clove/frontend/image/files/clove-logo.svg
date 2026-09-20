@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 840 280" width="840" height="280" role="img" aria-label="clove">
+  <defs>
+    <linearGradient id="clove-logo-grad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FF5F0A"/>
+      <stop offset="1" stop-color="#FF9F1C"/>
+    </linearGradient>
+  </defs>
+  <g transform="translate(60 206)">
+    <!-- Tilted floating bud symbol: orange-to-amber head, warm dark brown stem -->
+    <g transform="translate(70 -78) rotate(35) translate(-40 -84)">
+      <circle cx="40" cy="40" r="32" fill="url(#clove-logo-grad)"/>
+      <path d="M28 88 L52 88 L40 168 Z" fill="currentColor" fill-opacity="1" stroke="currentColor" stroke-opacity="1" stroke-width="4" stroke-linejoin="round"/>
+    </g>
+    <!-- Clove wordmark -->
+    <g transform="translate(172 0)" fill="none" stroke="currentColor" stroke-width="14" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M94 -82 A50 50 0 1 0 94 -18"/>
+      <path d="M126 -140 V0"/>
+      <circle cx="208" cy="-50" r="50"/>
+      <path d="M292 -100 L342 0 L392 -100"/>
+      <path d="M424 -50 H524 A50 50 0 1 0 512 -18"/>
+    </g>
+  </g>
+</svg>

@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Union
 from pydantic import BaseModel, EmailStr, Field
 
 class SignupRequest(BaseModel):
@@ -22,7 +22,7 @@ class IssueCreate(BaseModel):
     status: str = "To Do"
     priority: str = "Medium"
     due_date: str = Field(min_length=1)
-    estimation: float = Field(gt=0)
+    estimation: Union[int, float] = Field(gt=0)
     assignee_id: Optional[str] = None
 
 class IssueUpdate(BaseModel):
@@ -31,13 +31,14 @@ class IssueUpdate(BaseModel):
     status: Optional[str] = None
     priority: Optional[str] = None
     due_date: Optional[str] = None
-    estimation: Optional[float] = None
+    estimation: Optional[Union[int, float]] = None
     assignee_id: Optional[str] = None
     archived: Optional[bool] = None
 
 class CommentCreate(BaseModel):
     issue_id: str
-    body: str = Field(min_length=1, max_length=2000)
+    body: Optional[str] = Field(default="", max_length=2000)
+    attachment: Optional[dict] = None
 
 class NotificationMarkRead(BaseModel):
     read: bool = True

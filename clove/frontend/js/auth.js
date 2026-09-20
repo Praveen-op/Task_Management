@@ -23,10 +23,15 @@ if (loginForm) loginForm.addEventListener("submit", async e => {
     });
     localStorage.setItem("clove_token", data.access_token);
     localStorage.setItem("clove_user", JSON.stringify(data.user));
+    localStorage.removeItem("clove_project");
+    localStorage.removeItem("clove_tab");
+    localStorage.removeItem("clove_view");
+    localStorage.removeItem("clove_open_project");
+    localStorage.removeItem("clove_recent");
     location.href = getRedirectTarget();
   } catch(err) {
-    message.textContent = err.message;
-    message.style.color = "#c2410c";
+    message.textContent = `⚠️ ${err.message}`;
+    message.style.color = "var(--status-error)";
   }
 });
 
@@ -41,14 +46,14 @@ if (signupForm) signupForm.addEventListener("submit", async e => {
         password: document.getElementById("password").value
       })
     });
-    message.textContent = "Account created. Redirecting to login...";
-    message.style.color = "#15803d";
+    message.textContent = "✓ Account created. Redirecting to login...";
+    message.style.color = "var(--status-success)";
     const redirect = getRedirectTarget();
     setTimeout(() => {
       location.href = redirect !== "index.html" ? `login.html?redirect=${encodeURIComponent(redirect)}` : "login.html";
     }, 800);
   } catch(err) {
-    message.textContent = err.message;
-    message.style.color = "#c2410c";
+    message.textContent = `⚠️ ${err.message}`;
+    message.style.color = "var(--status-error)";
   }
 });
