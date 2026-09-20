@@ -1,6 +1,6 @@
 # CLOVE
 
-CLOVE is a Jira-like web application built with plain web development technologies.
+CLOVE is a Task Magaement web application built with plain web development technologies.
 
 ## Stack
 
@@ -43,16 +43,11 @@ Browser -> HTML/CSS/JavaScript -> REST API -> FastAPI -> PyMongo -> MongoDB
 
 ## Run Backend
 
-Open a terminal:
-
-```powershell
-cd backend
 python -m venv venv
-.env\Scriptsctivate
+.\venv\Scripts\Activate
 pip install -r requirements.txt
 copy .env.example .env
 uvicorn app.main:app --reload
-```
 
 Backend:
 http://127.0.0.1:8000
@@ -61,15 +56,7 @@ API docs:
 http://127.0.0.1:8000/docs
 
 ## Run Frontend
-
-Use VS Code Live Server on `frontend/index.html`, or serve the folder with any static web server.
-
-Example:
-
-```powershell
-cd frontend
 python -m http.server 5500
-```
 
 Then open:
 http://127.0.0.1:5500
@@ -83,17 +70,4 @@ Default connection:
 
 mongodb://localhost:27017
 
-Database:
 
-clove
-
-Collections:
-
-- users
-- projects
-- issues
-- comments
-
-## Important
-
-This is a complete starter implementation for local development. Before production deployment, configure a strong JWT secret, restrict CORS, add role-based permissions, indexes, rate limiting, structured logging, tests, HTTPS, and production secrets management.
