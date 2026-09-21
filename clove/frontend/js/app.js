@@ -1956,6 +1956,7 @@ async function openIssueModal(existing) {
               <div class="comment-add-row">
                 <input id="commentInput" placeholder="Add a comment…" autocomplete="off">
                 <input type="file" id="commentFileInput" style="display:none">
+                <button type="button" class="comment-improve-btn" id="commentImproveBtn" title="Improve sentence"><img src="image/wand.svg" class="app-icon" alt="Improve"></button>
                 <button type="button" class="comment-attach-btn" id="commentAttachBtn" title="Attach file"><img src="image/paperclip.svg" class="app-icon" alt="Attach"></button>
                 <button type="button" class="secondary" id="commentBtn">Post</button>
               </div>
@@ -2239,7 +2240,336 @@ async function openIssueModal(existing) {
         postComment();
       }
     };
+
+    const improveBtn = byId("commentImproveBtn");
+    if (improveBtn) {
+      improveBtn.onclick = () => {
+        const input = byId("commentInput");
+        const val = input.value;
+        if (!val || !val.trim()) {
+          showToast("Type a sentence first to improve it", "info");
+          input.focus();
+          return;
+        }
+        const improved = improveSentence(val);
+        if (improved === val) {
+          showToast("Sentence looks great already!", "info");
+        } else {
+          input.value = improved;
+          input.classList.remove("comment-improved-flash");
+          void input.offsetWidth;
+          input.classList.add("comment-improved-flash");
+          showToast("Sentence improved!", "success");
+        }
+        input.focus();
+      };
+    }
   }
+}
+
+// --- Automatic Spell Correction & Sentence Improvement Engine ---
+const SPELL_VOCABULARY = (
+  "the of and a to in is you that it he was for on are as with his they i at be this have from or one had by word but not what all were we when your can said there use an each which she do how their if will up other about out many then them these so some her would make like him into time has look two more write go see number no way could people my than first water been call who oil its now find long down day did get come made may part " +
+  "over new sound take only little work know place year live me back give most very after thing our just name good sentence sentences man think say great where much through before line right too mean old any same tell boy follow came want show also around form three small set put end does another well large must big even such because turn here why ask went men read need land different home us move try kind hand picture again change off play spell air away animal house point page letter mother answer found study still learn should world high every near add food between own below country plant last school father keep tree never start city earth eye light thought head under story saw left few while along might close something seem next hard open example begin life always those both paper together got group often run important until children side feet car mile night walk white sea began grow took river four carry state once book hear stop without second late miss idea enough eat face watch far real almost let above sometimes mountain cut young talk soon list song being leave family " +
+  "able about above absolute accept accepted accepting accepts acceptance account accounts across action actions actual actually adjust adjusted adjusting adjustment agree agreed agreeing ahead allow allowed allowing allows almost already alright always among amount another answer answered answering answers anyway appear appeared appearing appearance apply applied applying approve approved approving approval area argue around arrange arranged arrangement article aspect attach attached attaching attachment attachments attempt attempted attend attitude author aware basic basis battle beautiful become became becoming begin began beginning begins believe believed believing belongs beside beyond block blocked blocking blocks board boards branch branches brief bring brought bringing build built building builds cause caused causing causes central certain certainly chain chair change changed changing changes charge charged check checked checking checks choose chose chosen claim clear cleared clearly close closed closing closes collect collected common compare compared comparison concern confirm confirmed confirming confirmation consider contain contains continue continued control controlled controls correct corrected correcting corrects correction corrections could course cover covered create created creating creates creation credit cross current currently danger decide decided declare default define defined definition degree deliver delivered depend depended dependent dependency dependencies derive design designed detail detailed details detect detected determine develop developed developer development device differ direct direction discuss discussed discussing discussion display displayed divide double doubt draft draw drive drop dropped early easy easily effect either elect element enable enabled enjoy ensure enter entered entire equal equip escape event events every exact exactly except expect expected explain explained extend factor failure failures faith false famous fast faster fastest fear field fight figure final finally find found first fixed focus force forget forgot forgotten form found free fresh front full fully function functions functional functionality future general generally gentle gift glad global grade grant great greatly green ground group groups grow grew growing guess guide handle handled handling happen happened happening happy hard hardly heart heavy help helped helping helps helper helpful hide hid hidden high higher highest hold held hope huge human ideal ignore ignored image imagine impact imply impose improve improved improving improves improvement improvements include included including includes index inform inject inside insist intend introduce invest issue issues issued join joined judge keep kept kill know knew known knowledge lack large larger largest late later latest laugh lead led leading learn learned leave left level light limit limited list listed listing live load loaded loading local lock locked logic logical login logout long look looked looking looks loose lose lost loss love main maintain maintained maintenance major make made making makes manage managed managing management manager managers market mass master match matched matches material matter mean meant measure meet met member members memory mention mentioned message messages messaging method methods middle might mind minute minutes modern moment move moved moving movement name named names nation natural near nearly neat need needed needs never new next nice night normal normally note noted notes notice noticed number numbers object objects obtain occur occurred occurring occurs offer offered old once open opened opening opens operate operated operation operations operator operators opinion opinions option options order ordered orders ordinal organization organized original orphan other others ought outcome output outside over own page pages part parts path peace peak period person persons personal phrase pick picked place placed plan planned planning plans plant point pointed points policy poor popular position positive possible post posted posting posts potential power prepare prepared present press price primary print prior private privilege problem problems proceed process processed processes processing produce produced product production profession professional program programs progress project projects prompt proper properly protect protected protection provide provided public publish published pull pulled pulling push pushed pushing quality quick quickly quiet quite raise raised range rate reach reached reaching reaction read reading ready real really reason recall receive received receiving receives receiver recognize recognized record recorded recording reduce reduced region regular reject rejected relation relationship release released releasing releases reliability reliable remain remained remember remind reminder remote remove removed removing removes repeat replace replaced report reported reporting reports request requested requesting requests require required requiring requirements resolve resolved resolving resolution respect respond responded responding response responses responsive rest restart restore result resulted results resume retain return returned reveal review reviewed reviewing reviews revise revised revision rich right role room round routine routing row rule runner running runtime safe safety save saved saving scalar scale scan scenario scene schedule scheduled scheduling schema scope score screen search searched searching season second section security see seek seem select selected send sent sending sense serve server servers service services session session settle severe shade shape share shared sharing shift shock shoot short should show showed shown showing side sight sign signature simple simply simulation since single site skill sleep slow small smart smooth social software solution solutions solve solved solving some sometimes sort sorted sorting sound source space speak special speed spend spent stage standard standards start started starting state stated static status stay stayed step steps still stop stopped stopping storage store strategy street stress strict strong structure style submit submitted submitting submits subscription success successful successfully sudden suggest suggested suggestion suggestions suit suitable support supported supporting sure switch system systems table tables take took taken target task tasks teach team teams temporary term terms test tested testing tests text thank thanked thanks theme then theory there therefore thing things think thought threat three through time timeline timeout tiny title titles today together tomorrow tonight top total touch tough trace track transaction transfer transient transform transition translate transmit travel treat trend trouble true truly trust try tried trying turn turned type types typed typing unable under understand understood unit unless until update updated updating updates upgrade upload uploaded upon upper urge usage user users usual valid validate validation validator value values variable variables various version versions view viewed viewing views visit voice wait waited waiting walk want wanted warn warning watch watched water weapon week weeks weight welcome well whatever whenever whereas whether which while white whole wide will window wipe wish with within without word words work worked working works worker workflow workload workspace world worry worse worth would write wrote written writing wrong yard year years young"
+);
+
+const SPELL_SET = new Set(
+  SPELL_VOCABULARY.toLowerCase()
+    .replace(/[^a-z\s]/g, " ")
+    .split(/\s+/)
+    .filter(Boolean)
+);
+
+// Group words by their first letter for instant sub-millisecond Levenshtein-2 lookups
+const DICT_BY_LETTER = {};
+for (const w of SPELL_SET) {
+  const ch = w[0];
+  if (!DICT_BY_LETTER[ch]) DICT_BY_LETTER[ch] = [];
+  DICT_BY_LETTER[ch].push(w);
+}
+
+// Fast Damerau-Levenshtein distance (supports swaps, deletions, insertions, substitutions)
+function getDamerauLevenshtein(a, b) {
+  const al = a.length;
+  const bl = b.length;
+  if (Math.abs(al - bl) > 2) return 99;
+  const d = [];
+  for (let i = 0; i <= al; i++) d[i] = [i];
+  for (let j = 0; j <= bl; j++) d[0][j] = j;
+  for (let i = 1; i <= al; i++) {
+    for (let j = 1; j <= bl; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      d[i][j] = Math.min(
+        d[i - 1][j] + 1,
+        d[i][j - 1] + 1,
+        d[i - 1][j - 1] + cost
+      );
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) {
+        d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
+      }
+    }
+  }
+  return d[al][bl];
+}
+
+const EXPLICIT_TYPOS = {
+  // Slang & informal abbreviations
+  "pls": "please",
+  "plz": "please",
+  "thx": "thank you",
+  "ty": "thank you",
+  "u": "you",
+  "ur": "your",
+  "r": "are",
+  "b/c": "because",
+  "bc": "because",
+  "w/": "with",
+  "w/o": "without",
+  "gonna": "going to",
+  "wanna": "want to",
+  "gotta": "got to",
+  "asap": "ASAP",
+  "fyi": "FYI",
+  "btw": "by the way",
+  "imo": "in my opinion",
+  "imho": "in my opinion",
+  "idk": "I don't know",
+  "tbh": "to be honest",
+  "np": "no problem",
+  "omw": "on my way",
+  "eta": "ETA",
+  "alot": "a lot",
+  "noone": "no one",
+  "prolly": "probably",
+  "cuz": "because",
+
+  // Missing apostrophes & contractions
+  "dont": "don't",
+  "doesnt": "doesn't",
+  "didnt": "didn't",
+  "cant": "can't",
+  "wont": "won't",
+  "wouldnt": "wouldn't",
+  "couldnt": "couldn't",
+  "shouldnt": "shouldn't",
+  "isnt": "isn't",
+  "arent": "aren't",
+  "wasnt": "wasn't",
+  "werent": "weren't",
+  "hasnt": "hasn't",
+  "havent": "haven't",
+  "hadnt": "hadn't",
+  "youre": "you're",
+  "theyre": "they're",
+  "weve": "we've",
+  "theyve": "they've",
+  "youve": "you've",
+  "im": "I'm",
+  "ill": "I'll",
+  "ive": "I've",
+  "id": "I'd",
+  "lets": "let's",
+  "thats": "that's",
+  "whats": "what's",
+  "heres": "here's",
+  "theres": "there's",
+  "itll": "it'll",
+  "whos": "who's",
+
+  // Common misspellings (explicit overrides for guaranteed accuracy)
+  "teh": "the",
+  "recieve": "receive",
+  "recieved": "received",
+  "recieving": "receiving",
+  "seperate": "separate",
+  "seperated": "separated",
+  "seperating": "separating",
+  "definately": "definitely",
+  "definitly": "definitely",
+  "untill": "until",
+  "wierd": "weird",
+  "occured": "occurred",
+  "occuring": "occurring",
+  "neccessary": "necessary",
+  "necesary": "necessary",
+  "acheive": "achieve",
+  "acheived": "achieved",
+  "accomodate": "accommodate",
+  "calender": "calendar",
+  "tommorrow": "tomorrow",
+  "tomorow": "tomorrow",
+  "goverment": "government",
+  "enviornment": "environment",
+  "sucess": "success",
+  "sucessful": "successful",
+  "truely": "truly",
+  "beleive": "believe",
+  "beleived": "believed",
+  "recomended": "recommended",
+  "reccomend": "recommend",
+  "reccomended": "recommended",
+  "maintainance": "maintenance",
+  "privilege": "privilege",
+  "privelege": "privilege",
+  "begining": "beginning",
+  "adress": "address",
+  "writting": "writing",
+  "documantation": "documentation",
+  "runing": "running",
+  "conection": "connection",
+  "authntication": "authentication",
+  "atachment": "attachment",
+  "asignee": "assignee",
+  "requirment": "requirement",
+  "requierd": "required",
+  "prioriy": "priority",
+  "staus": "status",
+  "submited": "submitted",
+  "upldated": "updated",
+  "mesage": "message",
+  "relese": "release",
+  "feautre": "feature",
+  "compelted": "completed",
+  "finsihed": "finished",
+  "functon": "function",
+  "problm": "problem",
+  "libary": "library",
+  "responce": "response",
+  "correvtion": "correction",
+  "corection": "correction"
+};
+
+function correctWordSpelling(word) {
+  if (!word || word.length < 2) return word;
+
+  // Preserve acronyms, URLs, snake_case, or numbers
+  if (!/^[a-zA-Z']+$/.test(word)) return word;
+
+  const lower = word.toLowerCase();
+
+  // 1. Check explicit typo / slang dictionary
+  if (EXPLICIT_TYPOS[lower]) {
+    const repl = EXPLICIT_TYPOS[lower];
+    if (word === word.toUpperCase() && word.length > 1) return repl.toUpperCase();
+    if (word[0] === word[0].toUpperCase()) return repl.charAt(0).toUpperCase() + repl.slice(1);
+    return repl;
+  }
+
+  // 2. If already valid in dictionary, keep
+  if (SPELL_SET.has(lower)) {
+    return lower === "i" ? "I" : word;
+  }
+
+  // 3. Edit-distance-1 Candidate Generation (Norvig Levenshtein)
+  const n = lower.length;
+  if (n < 4) {
+    return lower === "i" ? "I" : word;
+  }
+
+  const candidates = [];
+
+  // Transpositions (e.g., "teh" -> "the", "feautre" -> "feature", "compelted" -> "completed")
+  for (let i = 0; i < n - 1; i++) {
+    const trans = lower.slice(0, i) + lower[i + 1] + lower[i] + lower.slice(i + 2);
+    if (SPELL_SET.has(trans)) candidates.push({ word: trans, prio: 1 });
+  }
+
+  // Deletions (e.g., "writting" -> "writing")
+  for (let i = 0; i < n; i++) {
+    const del = lower.slice(0, i) + lower.slice(i + 1);
+    if (SPELL_SET.has(del)) candidates.push({ word: del, prio: 2 });
+  }
+
+  // Insertions (e.g., "runing" -> "running", "mesage" -> "message", "problm" -> "problem")
+  const alphabet = "abcdefghijklmnopqrstuvwxyz";
+  for (let i = 0; i <= n; i++) {
+    for (let j = 0; j < 26; j++) {
+      const ins = lower.slice(0, i) + alphabet[j] + lower.slice(i);
+      if (SPELL_SET.has(ins)) candidates.push({ word: ins, prio: 3 });
+    }
+  }
+
+  // Substitutions (e.g., "correvtion" -> "correction", "documantation" -> "documentation")
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < 26; j++) {
+      if (alphabet[j] === lower[i]) continue;
+      const sub = lower.slice(0, i) + alphabet[j] + lower.slice(i + 1);
+      if (SPELL_SET.has(sub)) candidates.push({ word: sub, prio: 4 });
+    }
+  }
+
+  if (candidates.length > 0) {
+    // Pick candidate with highest priority (transposition > deletion > insertion > substitution)
+    candidates.sort((a, b) => a.prio - b.prio);
+    const chosen = candidates[0].word;
+    if (word === word.toUpperCase() && word.length > 1) return chosen.toUpperCase();
+    if (word[0] === word[0].toUpperCase()) return chosen.charAt(0).toUpperCase() + chosen.slice(1);
+    return chosen;
+  }
+
+  // 4. Edit-distance-2 Fallback via Damerau-Levenshtein on letter-indexed bucket
+  const firstChar = lower[0];
+  const bucket = DICT_BY_LETTER[firstChar] || [];
+  let bestWord = null;
+  let bestDist = 3;
+
+  for (let i = 0; i < bucket.length; i++) {
+    const candidate = bucket[i];
+    if (Math.abs(candidate.length - n) <= 2) {
+      const dist = getDamerauLevenshtein(lower, candidate);
+      if (dist < bestDist) {
+        bestDist = dist;
+        bestWord = candidate;
+        if (dist === 1) break;
+      }
+    }
+  }
+
+  if (bestWord && bestDist <= 2) {
+    if (word === word.toUpperCase() && word.length > 1) return bestWord.toUpperCase();
+    if (word[0] === word[0].toUpperCase()) return bestWord.charAt(0).toUpperCase() + bestWord.slice(1);
+    return bestWord;
+  }
+
+  return word;
+}
+
+function improveSentence(text) {
+  if (!text || typeof text !== "string") return text;
+  let s = text.trim();
+  if (!s) return s;
+
+  // 1. Collapse multiple spaces
+  s = s.replace(/[ \t]+/g, " ");
+
+  // 2. Clean punctuation spacing
+  s = s.replace(/\s+([,.:;!?])/g, "$1");
+  s = s.replace(/([,.:;!?])([A-Za-z0-9])/g, "$1 $2");
+
+  // 3. Normalize repeated punctuation
+  s = s.replace(/\.{4,}/g, "...");
+  s = s.replace(/(?<!\.)\.{2}(?!\.)/g, ".");
+  s = s.replace(/!{2,}/g, "!");
+  s = s.replace(/\?{2,}/g, "?");
+  s = s.replace(/,{2,}/g, ",");
+
+  // 4. Automatic Spell Correction & Word Transformation
+  s = s.replace(/\b[a-zA-Z']+\b/g, match => {
+    return correctWordSpelling(match);
+  });
+
+  // 5. Sentence capitalization
+  s = s.charAt(0).toUpperCase() + s.slice(1);
+  s = s.replace(/([.!?]\s+)([a-z])/g, (_, p1, p2) => p1 + p2.toUpperCase());
+  s = s.replace(/(\n\s*)([a-z])/g, (_, p1, p2) => p1 + p2.toUpperCase());
+
+  // 6. Ensure terminal punctuation if multiple words
+  if (s.includes(" ") && !/[.!?:\-]$/.test(s)) {
+    s += ".";
+  }
+
+  return s;
 }
 
 async function loadComments(issueId, isSilent = false) {
