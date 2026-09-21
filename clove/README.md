@@ -70,4 +70,15 @@ Default connection:
 
 mongodb://localhost:27017
 
+The backend can be built and run as a standalone container using Docker:
+
+### 1. Build the Docker Image
+docker build -t clove-backend 
+
+## 2. Run the Container
+
+docker run 
+
+
+
 
