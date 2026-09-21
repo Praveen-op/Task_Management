@@ -4,6 +4,8 @@ from pymongo import MongoClient
 from dotenv import load_dotenv
 
 load_dotenv()
+# Connected to MongoDB Atlas Cloud Database
+
 
 MONGO_URI = os.getenv(
     "MONGO_URI",
