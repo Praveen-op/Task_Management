@@ -1,8 +1,9 @@
 // Auto-detect environment (localhost vs production cloud deployment)
 const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
 
-// Change this to your live Render backend URL once deployed (e.g. "https://clove-backend.onrender.com")
-const PRODUCTION_BACKEND_URL = window.CLOVE_BACKEND_URL || "https://clove-backend.onrender.com";
+// Live Render backend URL
+const PRODUCTION_BACKEND_URL = window.CLOVE_BACKEND_URL || "https://task-management-qdyb.onrender.com";
+
 
 const API_BASE = isLocal ? "http://127.0.0.1:8000" : PRODUCTION_BACKEND_URL;
 

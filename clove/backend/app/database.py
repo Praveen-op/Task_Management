@@ -17,12 +17,24 @@ DATABASE_NAME = os.getenv(
     "clove"
 )
 
+client_kwargs = {
+    "serverSelectionTimeoutMS": 5000
+}
+
+if "mongodb+srv" in MONGO_URI or "tls=true" in MONGO_URI:
+    try:
+        import certifi
+        client_kwargs["tlsCAFile"] = certifi.where()
+    except Exception:
+        pass
+
 client = MongoClient(
     MONGO_URI,
-    serverSelectionTimeoutMS=5000
+    **client_kwargs
 )
 
 db = client[DATABASE_NAME]
+
 
 users_collection = db["users"]
 projects_collection = db["projects"]
