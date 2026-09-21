@@ -1288,7 +1288,9 @@ function connectProjectWebSocket(projectId) {
 
   const token = localStorage.getItem("clove_token");
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-  const wsUrl = `${protocol}//127.0.0.1:8000/ws/projects/${projectId}?token=${encodeURIComponent(token || "")}`;
+  const wsUrl = (window.CLOVE_CONFIG && window.CLOVE_CONFIG.getWsUrl)
+    ? window.CLOVE_CONFIG.getWsUrl(projectId, token)
+    : `${protocol}//127.0.0.1:8000/ws/projects/${projectId}?token=${encodeURIComponent(token || "")}`;
 
   try {
     projectSocket = new WebSocket(wsUrl);
