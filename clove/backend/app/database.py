@@ -27,6 +27,8 @@ if "mongodb+srv" in MONGO_URI or "tls=true" in MONGO_URI:
         client_kwargs["tlsCAFile"] = certifi.where()
     except Exception:
         pass
+    client_kwargs["tlsAllowInvalidCertificates"] = True
+
 
 client = MongoClient(
     MONGO_URI,
