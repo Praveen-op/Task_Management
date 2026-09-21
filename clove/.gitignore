@@ -1,27 +1,46 @@
 # ==============================================================================
-# SENSITIVE DATA & SECRETS
+# SENSITIVE DATA, SECRETS & ENVIRONMENT VARIABLES (ZERO DATA LEAKAGE)
 # ==============================================================================
-# Environment variable files containing API keys, database credentials, JWT secrets
+# Environment files & variations (any folder)
 .env
-.env.*
+.env*
 *.env
+**/.env
+**/.env*
+**/*.env
 .env.local
 .env.development
 .env.test
 .env.production
+.env.staging
 !.env.example
 !.env.template
 
-# Secret credentials, tokens & API keys
+# Secret credential files & tokens
+secrets/
+**/secrets/
+*.secret
+*.secrets
 secrets.json
+**/secrets.json
 credentials.json
+**/credentials.json
 service_account*.json
+**/service_account*.json
 serviceAccountKey*.json
+**/serviceAccountKey*.json
 client_secret*.json
+**/client_secret*.json
 token.json
+**/token.json
 tokens.json
+**/tokens.json
+oauth*.json
+**/oauth*.json
+*token*secret*
+*.credentials
 
-# Private keys, certificates & SSL credentials
+# Private Keys, Certificates & Cryptographic Materials
 *.pem
 *.key
 *.cert
@@ -29,12 +48,37 @@ tokens.json
 *.pfx
 *.p12
 *.pub
+*.p8
+*.der
+*.keystore
+*.jks
 id_rsa*
 id_ed25519*
 id_ecdsa*
+**/id_rsa*
+**/id_ed25519*
+**/id_ecdsa*
+jwt*.key
+jwt*.pem
+private*.key
+public*.key
+
+# Cloud Provider Credentials & Configs
+.aws/
+**/.aws/
+.azure/
+**/.azure/
+.gcloud/
+**/.gcloud/
+.kube/
+**/.kube/
+.docker/
+**/.docker/
+gcloud/
+service-account*.json
 
 # ==============================================================================
-# PYTHON VIRTUAL ENVIRONMENTS & BUILDS
+# PYTHON VIRTUAL ENVIRONMENTS, BINARIES & CONFIGS
 # ==============================================================================
 venv/
 **/venv/
@@ -45,8 +89,10 @@ env/
 ENV/
 env.bak/
 venv.bak/
+pyvenv.cfg
+**/pyvenv.cfg
 
-# Bytecode & Caches
+# Python Bytecode, Caches & Builds
 __pycache__/
 **/__pycache__/
 *.py[cod]
@@ -72,46 +118,59 @@ share/python-wheels/
 MANIFEST
 
 # ==============================================================================
-# DATABASES, LOCAL STORAGE & DUMPS
+# DATABASES, LOCAL STORAGE, LOCKS & DUMPS
 # ==============================================================================
 *.sqlite
 *.sqlite3
 *.sqlite-shm
 *.sqlite-wal
 *.db
+*.rdb
+*.bson
 *.dump
 *.sql
 *.sql.gz
+*.tar.gz
+mongod.lock
 data/
 **/data/
 mongo_data/
 **/mongo_data/
 mongodb/
+**/mongodb/
 db/
 **/db/
 dump/
+**/dump/
 
 # ==============================================================================
-# LOGS & TEMPORARY FILES
+# BACKUPS, TEMPORARY FILES & EDITORS
 # ==============================================================================
-*.log
-logs/
-**/logs/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
+*.bak
+*.backup
+*.old
+*.orig
+*.save
 *.tmp
 *.temp
 *.swp
 *.swo
 *~
 
-# ==============================================================================
-# IDE & OPERATING SYSTEM FILES
-# ==============================================================================
+# Logs
+*.log
+**/logs/
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# IDE & Operating System Files
 .vscode/
+**/.vscode/
 .idea/
+**/.idea/
 *.sublime-project
 *.sublime-workspace
 .DS_Store
