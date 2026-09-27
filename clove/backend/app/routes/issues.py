@@ -4,9 +4,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from pymongo import ReturnDocument
 
-from ..database import issues_collection, notifications_collection, projects_collection, users_collection
+from ..database import issues_collection, notifications_collection, projects_collection, users_collection, worklogs_collection
 from ..dependencies import current_user
-from ..schemas import IssueCreate, IssueUpdate
+from ..schemas import IssueCreate, IssueUpdate, WorklogCreate, DependencyCreate
 from ..websocket_manager import ws_manager
 
 router = APIRouter(prefix="/issues", tags=["Issues"])
@@ -26,10 +26,22 @@ class StatusUpdate(BaseModel):
 
 
 def serialize(x):
-    x["id"] = str(x.pop("_id"))
-    x["project_id"] = str(x["project_id"])
+    if not x:
+        return None
+    x = dict(x)
+    if "_id" in x:
+        x["id"] = str(x.pop("_id"))
+    elif "id" in x:
+        x["id"] = str(x["id"])
+    else:
+        x["id"] = ""
+    x["project_id"] = str(x.get("project_id", ""))
     x.setdefault("due_date", None)
+    x.setdefault("start_date", None)
     x.setdefault("estimation", None)
+    x.setdefault("logged_hours", 0.0)
+    x.setdefault("blocked_by", [])
+    x.setdefault("blocks", [])
     x.setdefault("archived", False)
     if "reporter_id" in x:
         x["reporter_id"] = str(x["reporter_id"])
@@ -58,6 +70,60 @@ def serialize(x):
             x.setdefault("number", 1)
             x.setdefault("key", f"ISS-{x.get('number', 1)}")
 
+    # Check dependency blocking status & clean up references to deleted tasks
+    blocked_by_ids = x.get("blocked_by", [])
+    blocker_keys = []
+    is_blocked = False
+    valid_blocked_by = []
+    if blocked_by_ids:
+        try:
+            b_oids = [ObjectId(bid) for bid in blocked_by_ids if ObjectId.is_valid(bid)]
+            if b_oids:
+                blockers = list(issues_collection.find({"_id": {"$in": b_oids}}, {"key": 1, "status": 1}))
+                found_bids = set(str(b["_id"]) for b in blockers)
+                valid_blocked_by = [bid for bid in blocked_by_ids if bid in found_bids]
+                for b in blockers:
+                    b_st = (b.get("status") or "").strip().lower()
+                    if b_st != "done":
+                        is_blocked = True
+                        blocker_keys.append(b.get("key") or str(b["_id"]))
+        except Exception:
+            pass
+    x["blocked_by"] = valid_blocked_by
+    x["blocked_by_keys"] = blocker_keys
+    x["is_blocked"] = is_blocked
+
+    # Blocked tasks separately come under Hold status
+    st_low = (x.get("status") or "").strip().lower()
+    if is_blocked and st_low != "done" and st_low not in ["hold", "on hold"]:
+        try:
+            issues_collection.update_one({"_id": x["_id"]}, {"$set": {"status": "Hold"}})
+            x["status"] = "Hold"
+        except Exception:
+            x["status"] = "Hold"
+
+    # Clean up blocks references to deleted tasks
+    blocks_ids = x.get("blocks", [])
+    valid_blocks = []
+    if blocks_ids:
+        try:
+            bk_oids = [ObjectId(bid) for bid in blocks_ids if ObjectId.is_valid(bid)]
+            if bk_oids:
+                existing_blocks = list(issues_collection.find({"_id": {"$in": bk_oids}}, {"_id": 1}))
+                found_bk_ids = set(str(b["_id"]) for b in existing_blocks)
+                valid_blocks = [bid for bid in blocks_ids if bid in found_bk_ids]
+        except Exception:
+            pass
+    x["blocks"] = valid_blocks
+
+    if "project_name" not in x:
+        try:
+            p_doc = projects_collection.find_one({"_id": ObjectId(x["project_id"])}, {"name": 1})
+            x["project_name"] = p_doc.get("name", "") if p_doc else ""
+        except Exception:
+            x["project_name"] = ""
+
+    x["issue_type"] = x.get("issue_type") or "Feature"
     return x
 
 
@@ -111,22 +177,40 @@ def check_project_permission(project_id: str, user: dict, action: str = "write")
     if user_id in member_ids:
         return project
 
+    # If the user has an issue assigned to them in this project
+    u_match = [user_id] + ([ObjectId(user_id)] if ObjectId.is_valid(user_id) else [])
+    if issues_collection.find_one({"project_id": p_oid, "assignee_id": {"$in": u_match}}):
+        projects_collection.update_one({"_id": p_oid}, {"$addToSet": {"members": user_id}})
+        return project
+
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,
         detail="Permission denied. You are not a member of this project.",
     )
 
 
-def normalize_status(raw_status: str | None) -> str:
+def normalize_status(raw_status: str | None, project_id: str | None = None) -> str:
     if not raw_status:
         return "To Do"
-    normalized = STATUS_MAP.get(raw_status.strip().lower())
-    if not normalized:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid task status '{raw_status}'. Must be one of: 'To Do', 'In Progress', 'Done'",
-        )
-    return normalized
+    raw_clean = raw_status.strip()
+    if raw_clean.lower() in STATUS_MAP:
+        return STATUS_MAP[raw_clean.lower()]
+
+    if project_id and ObjectId.is_valid(project_id):
+        proj = projects_collection.find_one({"_id": ObjectId(project_id)})
+        if proj and proj.get("statuses"):
+            allowed_names = [s.get("name") for s in proj["statuses"] if isinstance(s, dict)]
+            for name in allowed_names:
+                if name.lower() == raw_clean.lower():
+                    return name
+
+    if len(raw_clean) >= 2 and len(raw_clean) <= 40:
+        return raw_clean
+
+    raise HTTPException(
+        status_code=400,
+        detail=f"Invalid task status '{raw_status}'.",
+    )
 
 
 VALID_PRIORITIES = {"Lowest", "Low", "Medium", "High", "Highest", "Critical"}
@@ -163,12 +247,17 @@ def validate_estimation(est) -> int:
 
 @router.post("")
 async def create_issue(data: IssueCreate, user=Depends(current_user)):
+    if user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Only administrators have permission to create tasks.")
+
     project = check_project_permission(data.project_id, user, action="write")
 
     if not data.title or not data.title.strip():
         raise HTTPException(status_code=400, detail="Task Title is required.")
     if not data.description or not data.description.strip():
         raise HTTPException(status_code=400, detail="Description is required.")
+
+    issue_type = "Bug" if (data.issue_type or "").strip().lower() == "bug" else "Feature"
 
     final_status = normalize_status(data.status)
 
@@ -217,10 +306,15 @@ async def create_issue(data: IssueCreate, user=Depends(current_user)):
         "key": issue_key_str,
         "title": data.title.strip(),
         "description": data.description.strip(),
+        "issue_type": issue_type,
         "status": final_status,
         "priority": data.priority,
         "due_date": final_due_date,
+        "start_date": data.start_date or datetime.now(timezone.utc).strftime("%Y-%m-%d"),
         "estimation": final_estimation,
+        "logged_hours": 0.0,
+        "blocked_by": [],
+        "blocks": [],
         "assignee_id": assignee_id,
         "reporter_id": user["_id"],
         "archived": False,
@@ -231,6 +325,10 @@ async def create_issue(data: IssueCreate, user=Depends(current_user)):
     doc["_id"] = result.inserted_id
 
     if assignee_id:
+        projects_collection.update_one(
+            {"_id": proj_oid},
+            {"$addToSet": {"members": str(assignee_id)}}
+        )
         notify_assignee(str(result.inserted_id), assignee_id, user["_id"], doc["title"])
 
     serialized = serialize(doc)
@@ -259,6 +357,20 @@ def list_issues(
     user=Depends(current_user),
 ):
     query = {}
+    user_id = str(user["_id"])
+    user_oids = [ObjectId(user_id)] if ObjectId.is_valid(user_id) else []
+    user_match_ids = [user_id] + user_oids
+
+    # Auto-heal and sync all projects where user has assigned tasks
+    assigned_proj_raw = issues_collection.distinct("project_id", {"assignee_id": {"$in": user_match_ids}})
+    assigned_proj_oids = [ObjectId(pid) for pid in assigned_proj_raw if ObjectId.is_valid(str(pid))]
+    assigned_proj_all = assigned_proj_oids + [str(pid) for pid in assigned_proj_raw if pid]
+    if assigned_proj_all:
+        projects_collection.update_many(
+            {"_id": {"$in": assigned_proj_all}},
+            {"$addToSet": {"members": user_id}}
+        )
+
     if project_id:
         check_project_permission(project_id, user, action="read")
         try:
@@ -266,28 +378,33 @@ def list_issues(
         except Exception:
             return []
     else:
-        user_id = str(user["_id"])
-        user_oids = [ObjectId(user_id)] if ObjectId.is_valid(user_id) else []
-        user_match_ids = [user_id] + user_oids
-        accessible_filter = {
-            "$or": [
-                {"owner_id": {"$in": user_match_ids}},
-                {"members": {"$in": user_match_ids}},
-                {"members.user_id": {"$in": user_match_ids}},
-            ]
-        }
-        accessible_proj_ids = [p["_id"] for p in projects_collection.find(accessible_filter, {"_id": 1})]
-        if not accessible_proj_ids and user.get("role") != "admin":
-            return []
         if user.get("role") != "admin":
-            query["project_id"] = {"$in": accessible_proj_ids}
+            accessible_filter = {
+                "$or": [
+                    {"owner_id": {"$in": user_match_ids}},
+                    {"members": {"$in": user_match_ids}},
+                    {"members.user_id": {"$in": user_match_ids}},
+                    {"_id": {"$in": assigned_proj_all}},
+                ]
+            }
+            accessible_proj_ids = [p["_id"] for p in projects_collection.find(accessible_filter, {"_id": 1})]
+            all_accessible_ids = list(set(accessible_proj_ids + assigned_proj_all))
+
+            is_self_assignee = assignee_id and str(assignee_id) == user_id
+            if not all_accessible_ids and not is_self_assignee:
+                return []
+            if all_accessible_ids and not is_self_assignee:
+                query["project_id"] = {"$in": all_accessible_ids}
 
     if status:
         query["status"] = normalize_status(status)
     if priority:
         query["priority"] = priority
     if assignee_id:
-        query["assignee_id"] = assignee_id
+        a_matches = [str(assignee_id)]
+        if ObjectId.is_valid(str(assignee_id)):
+            a_matches.append(ObjectId(str(assignee_id)))
+        query["assignee_id"] = {"$in": a_matches}
     if not include_archived:
         query["archived"] = {"$ne": True}
 
@@ -348,10 +465,29 @@ async def update_issue(issue_id: str, data: IssueUpdate, user=Depends(current_us
     if "description" in changes:
         if not str(changes["description"]).strip():
             raise HTTPException(status_code=400, detail="Description cannot be empty.")
-        changes["description"] = str(changes["description"]).strip()
+    if "issue_type" in changes:
+        raw_t = str(changes["issue_type"]).strip().lower()
+        changes["issue_type"] = "Bug" if raw_t == "bug" else "Feature"
+    if "start_date" in changes and changes["start_date"]:
+        changes["start_date"] = str(changes["start_date"]).strip()[:10]
 
     if "status" in changes:
-        changes["status"] = normalize_status(changes["status"])
+        target_status = normalize_status(changes["status"], project_id=project_id_str)
+        changes["status"] = target_status
+        if target_status.lower() == "done":
+            blocked_by_ids = existing.get("blocked_by", [])
+            if blocked_by_ids:
+                b_oids = [ObjectId(bid) for bid in blocked_by_ids if ObjectId.is_valid(bid)]
+                incomplete_blockers = list(issues_collection.find(
+                    {"_id": {"$in": b_oids}, "status": {"$ne": "Done"}},
+                    {"key": 1}
+                ))
+                if incomplete_blockers:
+                    keys_str = ", ".join([b.get("key", "task") for b in incomplete_blockers])
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Cannot complete task: blocked by unresolved task(s): {keys_str}."
+                    )
 
     if "priority" in changes:
         if changes["priority"] not in VALID_PRIORITIES:
@@ -386,10 +522,33 @@ async def update_issue(issue_id: str, data: IssueUpdate, user=Depends(current_us
 
     # Notify new assignee if changed
     if "assignee_id" in changes and changes["assignee_id"]:
+        projects_collection.update_one(
+            {"_id": ObjectId(project_id_str)},
+            {"$addToSet": {"members": str(changes["assignee_id"])}}
+        )
         if changes["assignee_id"] != existing.get("assignee_id"):
             notify_assignee(issue_id, changes["assignee_id"], user["_id"], updated_issue["title"])
 
     serialized = serialize(updated_issue)
+
+    # When a task is marked Done, unblock any tasks that were waiting on it and return them to In Progress
+    if changes.get("status") == "Done":
+        blocked_tasks = list(issues_collection.find({"project_id": existing["project_id"], "blocked_by": str(oid)}))
+        for bt in blocked_tasks:
+            other_blockers = [x for x in bt.get("blocked_by", []) if str(x) != str(oid)]
+            has_other = False
+            if other_blockers:
+                try:
+                    ob_oids = [ObjectId(x) for x in other_blockers if ObjectId.is_valid(x)]
+                    if ob_oids:
+                        has_other = bool(issues_collection.find_one({"_id": {"$in": ob_oids}, "status": {"$ne": "Done"}}))
+                except Exception:
+                    pass
+            if not has_other:
+                issues_collection.update_one({"_id": bt["_id"]}, {"$set": {"status": "In Progress"}})
+                unblocked_doc = issues_collection.find_one({"_id": bt["_id"]})
+                if unblocked_doc:
+                    await ws_manager.broadcast_to_project(project_id_str, {"type": "issue_updated", "issue": serialize(unblocked_doc)})
 
     # Real-time WebSocket Broadcast to all connected team members
     await ws_manager.broadcast_to_project(
@@ -438,6 +597,7 @@ async def delete_issue(issue_id: str, user=Depends(current_user)):
         )
 
     issues_collection.delete_one({"_id": oid})
+    issues_collection.update_many({}, {"$pull": {"blocked_by": issue_id, "blocks": issue_id}})
 
     await ws_manager.broadcast_to_project(
         project_id_str,
@@ -502,3 +662,220 @@ async def complete_sprint(project_id: str, user=Depends(current_user)):
         "archived_count": archived_count,
         "completed": new_completed_state,
     }
+
+
+# ================= Worklog / Time Tracking =================
+
+@router.post("/{issue_id}/worklog")
+async def add_worklog(issue_id: str, data: WorklogCreate, user=Depends(current_user)):
+    try:
+        oid = ObjectId(issue_id)
+    except Exception:
+        raise HTTPException(400, "Invalid issue id")
+
+    existing = issues_collection.find_one({"_id": oid})
+    if not existing:
+        raise HTTPException(404, "Task not found")
+
+    check_project_permission(str(existing["project_id"]), user, action="write")
+
+    hours = round(float(data.hours), 2)
+    if hours <= 0:
+        raise HTTPException(400, "Hours logged must be greater than 0")
+
+    work_date = data.date or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    user_name = user.get("name", "Team member")
+    user_id = str(user["_id"])
+
+    worklog_doc = {
+        "issue_id": oid,
+        "project_id": existing["project_id"],
+        "user_id": ObjectId(user_id),
+        "user_name": user_name,
+        "user_email": user.get("email", ""),
+        "hours": hours,
+        "date": work_date,
+        "comment": (data.comment or "").strip(),
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    res = worklogs_collection.insert_one(worklog_doc)
+    worklog_doc["id"] = str(res.inserted_id)
+    worklog_doc["_id"] = str(res.inserted_id)
+    worklog_doc["issue_id"] = issue_id
+    worklog_doc["project_id"] = str(existing["project_id"])
+    worklog_doc["user_id"] = user_id
+
+    current_logged = float(existing.get("logged_hours") or 0.0)
+    new_logged = round(current_logged + hours, 2)
+    issues_collection.update_one(
+        {"_id": oid},
+        {"$set": {"logged_hours": new_logged, "updated_at": datetime.now(timezone.utc)}}
+    )
+
+    updated_issue = issues_collection.find_one({"_id": oid})
+    serialized = serialize(updated_issue)
+
+    await ws_manager.broadcast_to_project(
+        str(existing["project_id"]),
+        {
+            "type": "issue_updated",
+            "issue": serialized,
+            "actor_id": user_id,
+            "actor_name": user_name,
+        }
+    )
+
+    return worklog_doc
+
+
+@router.get("/{issue_id}/worklog")
+def get_worklogs(issue_id: str, user=Depends(current_user)):
+    try:
+        oid = ObjectId(issue_id)
+    except Exception:
+        raise HTTPException(400, "Invalid issue id")
+
+    existing = issues_collection.find_one({"_id": oid})
+    if not existing:
+        raise HTTPException(404, "Task not found")
+
+    check_project_permission(str(existing["project_id"]), user, action="read")
+
+    logs = list(worklogs_collection.find({"issue_id": oid}).sort("created_at", -1))
+    results = []
+    for l in logs:
+        results.append({
+            "id": str(l["_id"]),
+            "issue_id": issue_id,
+            "user_id": str(l.get("user_id", "")),
+            "user_name": l.get("user_name", "Team member"),
+            "hours": l.get("hours", 0.0),
+            "date": l.get("date", ""),
+            "comment": l.get("comment", ""),
+            "created_at": l.get("created_at", "")
+        })
+    return results
+
+
+@router.delete("/{issue_id}/worklog/{worklog_id}")
+async def delete_worklog(issue_id: str, worklog_id: str, user=Depends(current_user)):
+    try:
+        w_oid = ObjectId(worklog_id)
+        i_oid = ObjectId(issue_id)
+    except Exception:
+        raise HTTPException(400, "Invalid ID")
+
+    w_doc = worklogs_collection.find_one({"_id": w_oid, "issue_id": i_oid})
+    if not w_doc:
+        raise HTTPException(404, "Worklog not found")
+
+    user_id = str(user["_id"])
+    if str(w_doc.get("user_id")) != user_id and user.get("role") != "admin":
+        raise HTTPException(403, "You can only delete your own logged work entries.")
+
+    worklogs_collection.delete_one({"_id": w_oid})
+
+    all_logs = list(worklogs_collection.find({"issue_id": i_oid}))
+    total_hours = round(sum(float(l.get("hours", 0.0)) for l in all_logs), 2)
+
+    issues_collection.update_one(
+        {"_id": i_oid},
+        {"$set": {"logged_hours": total_hours, "updated_at": datetime.now(timezone.utc)}}
+    )
+
+    updated_issue = issues_collection.find_one({"_id": i_oid})
+    serialized = serialize(updated_issue)
+
+    await ws_manager.broadcast_to_project(
+        str(updated_issue["project_id"]),
+        {
+            "type": "issue_updated",
+            "issue": serialized,
+            "actor_id": user_id,
+            "actor_name": user.get("name", "Team member"),
+        }
+    )
+
+    return {"status": "deleted", "logged_hours": total_hours}
+
+
+# ================= Task Dependencies =================
+
+@router.post("/{issue_id}/dependencies")
+async def add_dependency(issue_id: str, data: DependencyCreate, user=Depends(current_user)):
+    try:
+        i_oid = ObjectId(issue_id)
+        t_oid = ObjectId(data.target_issue_id)
+    except Exception:
+        raise HTTPException(400, "Invalid issue ID format")
+
+    if issue_id == data.target_issue_id:
+        raise HTTPException(400, "A task cannot depend on itself.")
+
+    issue = issues_collection.find_one({"_id": i_oid})
+    target = issues_collection.find_one({"_id": t_oid})
+    if not issue or not target:
+        raise HTTPException(404, "Issue or target issue not found")
+
+    if str(issue["project_id"]) != str(target["project_id"]):
+        raise HTTPException(400, "Dependencies can only be linked between tasks in the same project.")
+
+    check_project_permission(str(issue["project_id"]), user, action="write")
+
+    dep_type = data.type
+    if dep_type == "blocked_by":
+        issues_collection.update_one({"_id": i_oid}, {"$addToSet": {"blocked_by": data.target_issue_id}})
+        issues_collection.update_one({"_id": t_oid}, {"$addToSet": {"blocks": issue_id}})
+        # Whenever blocked is linked -> show Hold status!
+        if (target.get("status") or "").strip().lower() != "done":
+            issues_collection.update_one({"_id": i_oid}, {"$set": {"status": "Hold"}})
+    else:
+        issues_collection.update_one({"_id": i_oid}, {"$addToSet": {"blocks": data.target_issue_id}})
+        issues_collection.update_one({"_id": t_oid}, {"$addToSet": {"blocked_by": issue_id}})
+        if (issue.get("status") or "").strip().lower() != "done":
+            issues_collection.update_one({"_id": t_oid}, {"$set": {"status": "Hold"}})
+
+    up1 = issues_collection.find_one({"_id": i_oid})
+    up2 = issues_collection.find_one({"_id": t_oid})
+    s_up1 = serialize(up1)
+    s_up2 = serialize(up2) if up2 else None
+    await ws_manager.broadcast_to_project(str(issue["project_id"]), {"type": "issue_updated", "issue": s_up1})
+    if s_up2:
+        await ws_manager.broadcast_to_project(str(issue["project_id"]), {"type": "issue_updated", "issue": s_up2})
+
+    return {"status": "linked", "issue": s_up1, "target": s_up2}
+
+
+@router.delete("/{issue_id}/dependencies/{target_issue_id}")
+async def remove_dependency(issue_id: str, target_issue_id: str, user=Depends(current_user)):
+    try:
+        i_oid = ObjectId(issue_id)
+        t_oid = ObjectId(target_issue_id)
+    except Exception:
+        raise HTTPException(400, "Invalid issue ID format")
+
+    issue = issues_collection.find_one({"_id": i_oid})
+    if not issue:
+        raise HTTPException(404, "Issue not found")
+
+    check_project_permission(str(issue["project_id"]), user, action="write")
+
+    issues_collection.update_one({"_id": i_oid}, {"$pull": {"blocked_by": target_issue_id, "blocks": target_issue_id}})
+    issues_collection.update_one({"_id": t_oid}, {"$pull": {"blocked_by": issue_id, "blocks": issue_id}})
+
+    up1 = issues_collection.find_one({"_id": i_oid})
+    up2 = issues_collection.find_one({"_id": t_oid})
+    s_up1 = serialize(up1)
+
+    # If remove the blocked -> automatically go to In Progress status!
+    if not s_up1.get("is_blocked"):
+        issues_collection.update_one({"_id": i_oid}, {"$set": {"status": "In Progress"}})
+        up1 = issues_collection.find_one({"_id": i_oid})
+        s_up1 = serialize(up1)
+
+    s_up2 = serialize(up2) if up2 else None
+    await ws_manager.broadcast_to_project(str(issue["project_id"]), {"type": "issue_updated", "issue": s_up1})
+    if s_up2:
+        await ws_manager.broadcast_to_project(str(issue["project_id"]), {"type": "issue_updated", "issue": s_up2})
+
+    return {"status": "unlinked", "issue": s_up1}

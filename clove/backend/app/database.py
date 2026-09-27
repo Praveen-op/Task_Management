@@ -44,6 +44,7 @@ issues_collection = db["issues"]
 comments_collection = db["comments"]
 notifications_collection = db["notifications"]
 invitations_collection = db["invitations"]
+worklogs_collection = db["worklogs"]
 
 
 def check_database():

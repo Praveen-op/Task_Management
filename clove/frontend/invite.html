@@ -358,13 +358,13 @@
       area.innerHTML = `
         <form id="inviteSignupForm">
           <label>Full Name
-            <input type="text" id="suName" required minlength="2" placeholder="Enter your name">
+            <input type="text" id="suName" required minlength="2">
           </label>
           <label>Email Address
-            <input type="email" id="suEmail" required placeholder="you@example.com">
+            <input type="email" id="suEmail" required>
           </label>
           <label>Password
-            <input type="password" id="suPass" required minlength="6" placeholder="At least 6 characters">
+            <input type="password" id="suPass" required minlength="6">
           </label>
           <button class="primary full" type="submit" id="suSubmitBtn" style="margin-top:16px;padding:12px">
             Create Account & Join
@@ -421,10 +421,10 @@
       area.innerHTML = `
         <form id="inviteLoginForm">
           <label>Email Address
-            <input type="email" id="liEmail" required placeholder="you@example.com">
+            <input type="email" id="liEmail" required>
           </label>
           <label>Password
-            <input type="password" id="liPass" required placeholder="Your password">
+            <input type="password" id="liPass" required>
           </label>
           <button class="primary full" type="submit" id="liSubmitBtn" style="margin-top:16px;padding:12px">
             Log In & Join

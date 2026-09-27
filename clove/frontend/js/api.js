@@ -1,11 +1,12 @@
-// Auto-detect environment (localhost vs production cloud deployment)
-const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+const host = window.location.hostname;
+const isLocal = host === "localhost" || host === "127.0.0.1" || host === "0.0.0.0" || host.startsWith("192.168.") || host.startsWith("10.") || host.startsWith("172.");
 
 // Live Render backend URL
 const PRODUCTION_BACKEND_URL = window.CLOVE_BACKEND_URL || "https://task-management-qdyb.onrender.com";
 
-
-const API_BASE = isLocal ? "http://127.0.0.1:8000" : PRODUCTION_BACKEND_URL;
+const API_BASE = isLocal 
+  ? `http://${host === "localhost" || host === "127.0.0.1" ? "127.0.0.1" : host}:8000` 
+  : PRODUCTION_BACKEND_URL;
 
 window.CLOVE_CONFIG = {
   isLocal,
@@ -38,6 +39,9 @@ async function api(path, options = {}) {
       location.href = "login.html";
     }
   }
-  if (!response.ok) throw new Error(data.detail || "Request failed");
+  if (!response.ok) {
+    const errorMsg = data.detail || (typeof data === "string" ? data : `Request failed (${response.status})`);
+    throw new Error(errorMsg);
+  }
   return data;
 }
