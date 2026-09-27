@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CLOVE — Documentation</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/svg+xml" href="image/files/clove-orange-icon.svg">
+  <script>(function(){const t=localStorage.getItem("clove_theme")||(window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light");document.documentElement.setAttribute("data-theme",t);})();</script>
+  <link rel="stylesheet" href="css/style.css?v=11.3">
+  <style>
+    body.manual-page {
+      background: var(--bg-body);
+      color: var(--text-primary);
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    .manual-topbar {
+      height: 60px;
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border-default);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+
+    .manual-brand,
+    .manual-brand:hover,
+    .manual-brand:focus,
+    .manual-brand:active {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none !important;
+      color: inherit;
+    }
+
+    .manual-brand img {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+    }
+
+    .manual-brand-text {
+      font-weight: 800;
+      font-size: 17px;
+      letter-spacing: -0.02em;
+      text-decoration: none !important;
+    }
+
+    .manual-brand-tag {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--primary);
+      background: var(--primary-light);
+      padding: 2px 8px;
+      border-radius: var(--radius-pill);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      text-decoration: none !important;
+      display: inline-block;
+    }
+
+    .manual-top-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .manual-search-box {
+      position: relative;
+      width: 280px;
+    }
+
+    .manual-search-box input {
+      width: 100%;
+      padding: 7px 12px 7px 34px;
+      font-size: 12.5px;
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius-pill);
+      background: var(--bg-body);
+      color: var(--text-primary);
+      box-sizing: border-box;
+    }
+
+    .manual-search-box input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px var(--primary-glow);
+      outline: none;
+    }
+
+    .manual-search-box svg {
+      position: absolute;
+      left: 11px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 14px;
+      height: 14px;
+      color: var(--text-muted);
+      pointer-events: none;
+    }
+
+    .manual-container {
+      display: flex;
+      flex: 1;
+      max-width: 1320px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 28px 24px;
+      gap: 36px;
+      box-sizing: border-box;
+    }
+
+    .manual-sidebar {
+      width: 250px;
+      flex-shrink: 0;
+      position: sticky;
+      top: 88px;
+      height: fit-content;
+      max-height: calc(100vh - 110px);
+      overflow-y: auto;
+    }
+
+    .manual-nav-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .manual-nav-link {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 12px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      text-decoration: none;
+      border-radius: var(--radius-sm);
+      transition: all var(--transition-fast);
+    }
+
+    .manual-nav-link:hover,
+    .manual-nav-link.active {
+      background: var(--primary-light);
+      color: var(--primary);
+    }
+
+    .manual-main {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 36px;
+    }
+
+    .manual-section {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 28px 32px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+    }
+
+    .manual-section-title {
+      font-size: 20px;
+      font-weight: 800;
+      color: var(--text-primary);
+      margin: 0 0 8px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .manual-section-sub {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-bottom: 20px;
+    }
+
+    .manual-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+      margin-top: 14px;
+    }
+
+    .manual-box {
+      padding: 16px;
+      background: var(--bg-body);
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-subtle);
+    }
+
+    .manual-box strong {
+      display: block;
+      color: var(--text-primary);
+      font-size: 13.5px;
+      margin-bottom: 6px;
+    }
+
+    .manual-box p {
+      margin: 0;
+      font-size: 12.5px;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+
+    .manual-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 14px;
+      font-size: 13px;
+    }
+
+    .manual-table th {
+      background: var(--bg-body);
+      text-align: left;
+      padding: 10px 14px;
+      font-weight: 700;
+      color: var(--text-primary);
+      border-bottom: 2px solid var(--border-default);
+    }
+
+    .manual-table td {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border-subtle);
+      color: var(--text-secondary);
+    }
+
+    .manual-tag-chip {
+      display: inline-flex;
+      align-items: center;
+      font-weight: 600;
+      color: var(--primary);
+      background: rgba(242, 106, 27, 0.08);
+      border-radius: 4px;
+      padding: 1px 6px;
+      font-size: 12px;
+    }
+
+    .manual-callout {
+      padding: 14px 18px;
+      background: var(--primary-light);
+      border-left: 4px solid var(--primary);
+      border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+      font-size: 13px;
+      color: var(--text-secondary);
+      line-height: 1.5;
+      margin: 16px 0;
+    }
+
+    .manual-callout strong {
+      color: var(--primary);
+    }
+
+    em, i {
+      font-style: normal;
+    }
+
+    @media (max-width: 900px) {
+      .manual-container {
+        flex-direction: column;
+      }
+      .manual-sidebar {
+        width: 100%;
+        position: static;
+        max-height: none;
+      }
+    }
+  </style>
+</head>
+<body class="manual-page">
+  <header class="manual-topbar">
+    <a href="index.html" class="manual-brand" style="text-decoration:none!important;">
+      <img src="image/files/clove-orange-icon.svg" alt="CLOVE">
+      <span class="manual-brand-text" style="text-decoration:none!important;">CLOVE</span>
+      <span class="manual-brand-tag" style="text-decoration:none!important;">Documentation</span>
+    </a>
+
+    <div class="manual-top-actions">
+      <div class="manual-search-box">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <input type="text" id="manualDocSearch" placeholder="Search guides & shortcuts…">
+      </div>
+
+      <button type="button" class="theme-toggle-btn" id="manualThemeBtn" style="padding:6px 12px;font-size:12px;">
+        <img src="image/moon.svg" class="app-icon theme-icon" alt=""> Theme
+      </button>
+
+      <a href="index.html" class="primary" style="text-decoration:none;padding:7px 14px;font-size:12.5px;font-weight:600;border-radius:var(--radius-pill);display:inline-flex;align-items:center;gap:6px;">
+        Go to Dashboard →
+      </a>
+    </div>
+  </header>
+
+  <div class="manual-container">
+    <aside class="manual-sidebar">
+      <ul class="manual-nav-list">
+        <li><a href="#getting-started" class="manual-nav-link active">🚀 1. Getting Started</a></li>
+        <li><a href="#projects-workspaces" class="manual-nav-link">📁 2. Projects & Workspaces</a></li>
+        <li><a href="#tasks-kanban" class="manual-nav-link">📋 3. Tasks & Kanban Board</a></li>
+        <li><a href="#collaboration" class="manual-nav-link">💬 4. Team Collaboration</a></li>
+        <li><a href="#roles-permissions" class="manual-nav-link">👥 5. Roles & Administration</a></li>
+        <li><a href="#shortcuts-tips" class="manual-nav-link">⚡ 6. Shortcuts & Tips</a></li>
+      </ul>
+    </aside>
+
+    <main class="manual-main">
+      <!-- Section 1 -->
+      <section id="getting-started" class="manual-section">
+        <h2 class="manual-section-title">🚀 1. Getting Started</h2>
+        <div class="manual-section-sub">Quick overview of accounts, navigation, and workspace preferences.</div>
+
+        <div class="manual-steps-list">
+          <div class="manual-step-item">
+            <div class="manual-step-num">1</div>
+            <div>
+              <strong>Account Setup & Invitation:</strong>
+              Sign up with your Name, Email, and Password, or join via an invitation link provided by your workspace Administrator.
+            </div>
+          </div>
+          <div class="manual-step-item">
+            <div class="manual-step-num">2</div>
+            <div>
+              <strong>Navigation Layout:</strong>
+              Use the top navigation bar for global search, creating tasks, notifications, and profile settings. Use the left sidebar to navigate between For You (your assigned tasks), Recent, Starred, All Projects, and My Team.
+            </div>
+          </div>
+          <div class="manual-step-item">
+            <div class="manual-step-num">3</div>
+            <div>
+              <strong>Light & Dark Themes:</strong>
+              Click your profile avatar in the top-right corner to toggle between Light and Dark mode. Your choice is saved automatically.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section 2 -->
+      <section id="projects-workspaces" class="manual-section">
+        <h2 class="manual-section-title">📁 2. Projects & Workspaces</h2>
+        <div class="manual-section-sub">Organize your team's initiatives with specialized project views and sprint tracking.</div>
+
+        <div class="manual-grid">
+          <div class="manual-box">
+            <strong>📊 Dashboard View</strong>
+            <p>Real-time Project Health score (0-100), sprint countdown indicators, status distributions, team workload analysis, and overdue task radars.</p>
+          </div>
+          <div class="manual-box">
+            <strong>📋 Kanban Board</strong>
+            <p>Visual workflow columns (To Do, In Progress, In Review, Done). Drag cards freely between columns to transition statuses instantly.</p>
+          </div>
+          <div class="manual-box">
+            <strong>📑 Backlog View</strong>
+            <p>Prioritized flat list of tasks for sprint planning, bulk status updates, and backlog grooming.</p>
+          </div>
+          <div class="manual-box">
+            <strong>📅 Timeline (Gantt)</strong>
+            <p>Visual schedule showing task durations based on start and due dates for milestone and release tracking.</p>
+          </div>
+        </div>
+
+        <div class="manual-callout">
+          <strong>Sprint Dates & Countdown:</strong>
+          Click Sprint Dates in the project header to set current sprint start and end dates. CLOVE automatically displays live badges like "3 days left" or "Ends today".
+        </div>
+      </section>
+
+      <!-- Section 3 -->
+      <section id="tasks-kanban" class="manual-section">
+        <h2 class="manual-section-title">📋 3. Task Management & Kanban Board</h2>
+        <div class="manual-section-sub">Create, prioritize, assign, and track work smoothly.</div>
+
+        <div class="manual-grid">
+          <div class="manual-box">
+            <strong>Creating Tasks</strong>
+            <p>Click the orange <strong>+ Create</strong> button in the top navbar or <strong>+ New Task</strong> in any Kanban column. Enter title, priority, due date, estimated days, and assignee.</p>
+          </div>
+          <div class="manual-box">
+            <strong>Drag-and-Drop</strong>
+            <p>Move task cards across columns. Team members viewing the board will see updates in real-time without needing to refresh.</p>
+          </div>
+          <div class="manual-box">
+            <strong>Filtering Tasks</strong>
+            <p>Filter tasks on the board by Priority (Urgent, High, Medium, Low) or by Assignee to focus on your immediate workload.</p>
+          </div>
+          <div class="manual-box">
+            <strong>Grouping Work</strong>
+            <p>Toggle grouping by Assignee or Priority to review team capacity and identify potential bottlenecks.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section 4 -->
+      <section id="collaboration" class="manual-section">
+        <h2 class="manual-section-title">💬 4. Team Collaboration & Comments</h2>
+        <div class="manual-section-sub">Communicate effectively within tasks using mentions, attachments, and writing tools.</div>
+
+        <div class="manual-steps-list">
+          <div class="manual-step-item">
+            <div class="manual-step-num">@</div>
+            <div>
+              <strong>Smart @Mentions:</strong>
+              Type <span class="manual-tag-chip">@</span> in the comment input to open user autocomplete. Use arrow keys and press <code>Enter</code> to tag a teammate. Tagged members receive instant notifications.
+            </div>
+          </div>
+          <div class="manual-step-item">
+            <div class="manual-step-num">📎</div>
+            <div>
+              <strong>Attachments & Screenshots:</strong>
+              Click the paperclip button to attach images or logs. Image attachments display inline thumbnails with full-size download links.
+            </div>
+          </div>
+          <div class="manual-step-item">
+            <div class="manual-step-num">🪄</div>
+            <div>
+              <strong>Magic Text Improver:</strong>
+              Click the wand icon next to any comment or description field to automatically correct spelling, polish punctuation, and capitalize sentences.
+            </div>
+          </div>
+          <div class="manual-step-item">
+            <div class="manual-step-num">🔔</div>
+            <div>
+              <strong>Notifications:</strong>
+              The bell icon in the top navbar displays a badge whenever you are assigned a task or mentioned. Click any alert to open the task directly.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section 5 -->
+      <section id="roles-permissions" class="manual-section">
+        <h2 class="manual-section-title">👥 5. User Roles & Administration</h2>
+        <div class="manual-section-sub">Permissions and capabilities for different workspace roles.</div>
+
+        <table class="manual-table">
+          <thead>
+            <tr>
+              <th>Feature / Action</th>
+              <th>Admin</th>
+              <th>Member</th>
+              <th>Developer</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>View Projects & Tasks</td>
+              <td>✅ Yes</td>
+              <td>✅ Yes</td>
+              <td>✅ Yes</td>
+            </tr>
+            <tr>
+              <td>Drag & Drop Kanban Statuses</td>
+              <td>✅ Yes</td>
+              <td>✅ Yes</td>
+              <td>✅ Yes</td>
+            </tr>
+            <tr>
+              <td>Add Comments, @Mentions & Files</td>
+              <td>✅ Yes</td>
+              <td>✅ Yes</td>
+              <td>✅ Yes</td>
+            </tr>
+            <tr>
+              <td>Create / Delete Projects</td>
+              <td>✅ Yes</td>
+              <td>❌ No</td>
+              <td>❌ No</td>
+            </tr>
+            <tr>
+              <td>Delete Tasks</td>
+              <td>✅ Yes</td>
+              <td>❌ No</td>
+              <td>❌ No</td>
+            </tr>
+            <tr>
+              <td>Invite New Team Members</td>
+              <td>✅ Yes</td>
+              <td>❌ No</td>
+              <td>❌ No</td>
+            </tr>
+            <tr>
+              <td>Configure Sprint Dates</td>
+              <td>✅ Yes</td>
+              <td>❌ No</td>
+              <td>❌ No</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="manual-callout">
+          <strong>Inviting Users:</strong> Admins can click Invite User in the sidebar, select the role, and generate a unique invitation link to send to new teammates.
+        </div>
+      </section>
+
+      <!-- Section 6 -->
+      <section id="shortcuts-tips" class="manual-section">
+        <h2 class="manual-section-title">⚡ 6. Shortcuts & Productivity Tips</h2>
+        <div class="manual-section-sub">Handy keyboard shortcuts to navigate faster.</div>
+
+        <div style="display:flex;flex-direction:column;gap:8px;margin-top:14px;">
+          <div class="manual-shortcut-row">
+            <span>Focus Global Search</span>
+            <span class="manual-key">/</span>
+          </div>
+          <div class="manual-shortcut-row">
+            <span>Close active modal or dropdown</span>
+            <span class="manual-key">Escape</span>
+          </div>
+          <div class="manual-shortcut-row">
+            <span>Submit comment</span>
+            <span class="manual-key">Enter</span>
+          </div>
+          <div class="manual-shortcut-row">
+            <span>Navigate @mention autocomplete</span>
+            <span class="manual-key">↑ / ↓</span>
+          </div>
+          <div class="manual-shortcut-row">
+            <span>Select highlighted @mention</span>
+            <span class="manual-key">Enter or Tab</span>
+          </div>
+          <div class="manual-shortcut-row">
+            <span>Toggle Theme</span>
+            <span style="font-size:12px;font-weight:600;color:var(--primary);">Profile Menu → Theme</span>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    // Theme toggle in manual page
+    const themeBtn = document.getElementById("manualThemeBtn");
+    if (themeBtn) {
+      themeBtn.onclick = () => {
+        const cur = document.documentElement.getAttribute("data-theme") || "light";
+        const next = cur === "dark" ? "light" : "dark";
+        document.documentElement.setAttribute("data-theme", next);
+        localStorage.setItem("clove_theme", next);
+      };
+    }
+
+    // Scrollspy for sidebar links
+    const links = document.querySelectorAll(".manual-nav-link");
+    const sections = document.querySelectorAll(".manual-section");
+
+    window.addEventListener("scroll", () => {
+      let current = "";
+      sections.forEach(sec => {
+        const top = sec.offsetTop - 120;
+        if (pageYOffset >= top) {
+          current = sec.getAttribute("id");
+        }
+      });
+      links.forEach(l => {
+        l.classList.remove("active");
+        if (l.getAttribute("href") === "#" + current) {
+          l.classList.add("active");
+        }
+      });
+    });
+
+    // Instant search filter
+    const searchInput = document.getElementById("manualDocSearch");
+    if (searchInput) {
+      searchInput.addEventListener("input", () => {
+        const q = searchInput.value.toLowerCase().trim();
+        sections.forEach(sec => {
+          if (!q || sec.innerText.toLowerCase().includes(q)) {
+            sec.style.display = "block";
+          } else {
+            sec.style.display = "none";
+          }
+        });
+      });
+    }
+  </script>
+</body>
+</html>

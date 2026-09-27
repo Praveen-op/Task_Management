@@ -399,6 +399,7 @@
 
           localStorage.setItem("clove_token", loginData.access_token);
           localStorage.setItem("clove_user", JSON.stringify(loginData.user));
+          localStorage.setItem("clove_new_user_guide_pending", "true");
 
           // 3. Automatically accept the invite
           submitBtn.textContent = "Joining team...";

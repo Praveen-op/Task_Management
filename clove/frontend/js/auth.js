@@ -23,6 +23,9 @@ if (loginForm) loginForm.addEventListener("submit", async e => {
     });
     localStorage.setItem("clove_token", data.access_token);
     localStorage.setItem("clove_user", JSON.stringify(data.user));
+    if (data.user && data.user.is_new_user) {
+      localStorage.setItem("clove_new_user_guide_pending", "true");
+    }
     localStorage.removeItem("clove_project");
     localStorage.removeItem("clove_tab");
     localStorage.removeItem("clove_view");
@@ -46,6 +49,7 @@ if (signupForm) signupForm.addEventListener("submit", async e => {
         password: document.getElementById("password").value
       })
     });
+    localStorage.setItem("clove_new_user_guide_pending", "true");
     message.textContent = "✓ Account created. Redirecting to login...";
     message.style.color = "var(--status-success)";
     const redirect = getRedirectTarget();

@@ -18,6 +18,7 @@ def signup(data: SignupRequest):
         "email": email,
         "password": hash_password(data.password),
         "role": "admin",
+        "is_new_user": True,
     }
     result = users_collection.insert_one(doc)
     user_id = str(result.inserted_id)
@@ -32,6 +33,7 @@ def signup(data: SignupRequest):
             "email": doc["email"],
             "role": "admin",
             "team_id": user_id,
+            "is_new_user": True,
         },
     }
 
@@ -44,6 +46,9 @@ def login(data: LoginRequest):
     user_id = str(user["_id"])
     team_id = user.get("team_id")
     role = user.get("role", "member")
+    is_new = bool(user.get("is_new_user", False))
+    if is_new:
+        users_collection.update_one({"_id": user["_id"]}, {"$unset": {"is_new_user": ""}})
 
     if not team_id:
         inv = invitations_collection.find_one({"accepted_by": user_id, "status": "accepted"})
@@ -66,5 +71,6 @@ def login(data: LoginRequest):
             "email": user["email"],
             "role": user.get("role", "admin"),
             "team_id": team_id,
+            "is_new_user": is_new,
         },
     }

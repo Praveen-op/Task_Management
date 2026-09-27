@@ -557,6 +557,18 @@ function shell() {
           <button class="small" data-view="team" data-tooltip="My Team"><img src="image/users.svg" class="app-icon nav-icon" alt=""> <span class="nav-text">My Team</span></button>
           <button class="small" id="sidebarInviteBtn" data-tooltip="Invite User"><img src="image/user-plus.svg" class="app-icon nav-icon" alt=""> <span class="nav-text">Invite User</span></button>
         </div>
+
+        <div class="nav-section-divider"></div>
+        <div class="nav-section-title">Help</div>
+        <div class="nav">
+          <button class="small" id="sidebarManualBtn" data-tooltip="Documentation">
+            <svg class="app-icon nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;">
+              <circle cx="12" cy="12" r="10"></circle>
+              <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+              <line x1="12" y1="17" x2="12.01" y2="17"></line>
+            </svg> <span class="nav-text">Documentation</span>
+          </button>
+        </div>
       </aside>
       <main id="content" class="content"></main>
     </div>
@@ -615,6 +627,15 @@ function setupShellHandlers() {
     updateThemeToggleButtons();
     themeToggle.onclick = (e) => { e.stopPropagation(); toggleTheme(); };
   }
+
+  // Documentation
+  const handleOpenManual = (e) => {
+    if (e) e.stopPropagation();
+    closeAllDropdowns();
+    window.open("manual.html", "_blank");
+  };
+  const sidebarManualBtn = byId("sidebarManualBtn");
+  if (sidebarManualBtn) sidebarManualBtn.onclick = handleOpenManual;
 
   document.addEventListener("click", () => closeAllDropdowns());
 
@@ -751,6 +772,19 @@ async function loadInitialData() {
       await openProject(pendingProject);
     } else {
       await restoreRoute();
+    }
+
+    // Automatically show new user guide ONLY when a brand new user arrives
+    const userTourKey = "clove_tour_seen_" + (currentUser.id || currentUser.email);
+    const isNewUserComing = localStorage.getItem("clove_new_user_guide_pending") === "true" ||
+                            Boolean(currentUser && currentUser.is_new_user) ||
+                            (!localStorage.getItem(userTourKey) && currentUser && currentUser.email && currentUser.email !== "prav@gmail.com");
+    if (isNewUserComing && !localStorage.getItem(userTourKey)) {
+      localStorage.removeItem("clove_new_user_guide_pending");
+      localStorage.setItem(userTourKey, "true");
+      setTimeout(() => {
+        startOnboardingTour();
+      }, 700);
     }
   } catch (e) {
     byId("content").innerHTML = `<div class="card"><h2>Could not load CLOVE</h2><p>${esc(e.message)}</p><p>Make sure FastAPI and MongoDB are running.</p></div>`;
@@ -3113,7 +3147,16 @@ async function openIssueModal(existing) {
         ${isEdit && existing ? `<span class="task-key-badge">${esc(issueKey(existing))}</span>` : ""}
         <h2>${isEdit ? "Edit Task" : "New Task"}</h2>
       </div>
-      <button type="button" class="close" onclick="closeModal()"><img src="image/close.svg" class="app-icon" alt="Close"></button>
+      <div class="task-modal-head-actions">
+        <button type="button" class="task-fullscreen-btn" id="taskFullscreenBtn" title="Full screen" aria-label="Full screen">
+          <svg class="app-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;">
+            <path d="M15 3h6v6"></path>
+            <path d="M10 14L21 3"></path>
+            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+          </svg>
+        </button>
+        <button type="button" class="close" onclick="closeModal()"><img src="image/close.svg" class="app-icon" alt="Close"></button>
+      </div>
     </div>
     <div id="taskErrorBox" class="form-error-banner hidden"></div>
     <form id="issueForm" class="task-modal-form" novalidate>
@@ -3729,6 +3772,35 @@ async function openIssueModal(existing) {
       if (commentInput) setupMentionAutocomplete(commentInput);
       const descInput = byId("idesc");
       if (descInput) setupMentionAutocomplete(descInput);
+    }
+
+    const fullscreenBtn = byId("taskFullscreenBtn");
+    if (fullscreenBtn) {
+      let isTaskFullscreen = false;
+      fullscreenBtn.onclick = () => {
+        isTaskFullscreen = !isTaskFullscreen;
+        const modalRootEl = byId("modal-root");
+        const card = modalRootEl ? modalRootEl.querySelector(".modal-task-card") : null;
+        const modal = modalRootEl ? modalRootEl.querySelector(".modal") : null;
+        if (card) card.classList.toggle("is-fullscreen", isTaskFullscreen);
+        if (modal) modal.classList.toggle("modal-fullscreen-active", isTaskFullscreen);
+        fullscreenBtn.title = isTaskFullscreen ? "Exit full screen" : "Full screen";
+        fullscreenBtn.setAttribute("aria-label", isTaskFullscreen ? "Exit full screen" : "Full screen");
+        fullscreenBtn.innerHTML = isTaskFullscreen ? `
+          <svg class="app-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;">
+            <path d="M4 14h6v6"></path>
+            <path d="M10 14L3 21"></path>
+            <path d="M20 10h-6V4"></path>
+            <path d="M14 10l7-7"></path>
+          </svg>
+        ` : `
+          <svg class="app-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;">
+            <path d="M15 3h6v6"></path>
+            <path d="M10 14L21 3"></path>
+            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+          </svg>
+        `;
+      };
     }
   } catch (err) {
     console.error("Error opening task modal:", err);
@@ -4405,6 +4477,307 @@ function openInviteModal(projectId = null) {
   };
 }
 
+function openUserManualModal(initialTab = "quickstart") {
+  closeAllDropdowns();
+  const modalRoot = byId("modal-root");
+
+  modalRoot.innerHTML = `
+    <div class="modal">
+      <div class="modal-card user-manual-modal">
+        <div class="modal-head" style="align-items:flex-start;padding-bottom:6px;">
+          <div>
+            <div class="manual-head-badge">📖 Documentation</div>
+            <h2 style="margin:2px 0 4px;font-size:19px;">CLOVE Documentation</h2>
+            <p class="muted" style="margin:0;font-size:12.5px;">Everything you need to master projects, tasks, Kanban boards, and collaboration.</p>
+          </div>
+          <button class="close" onclick="closeModal()"><img src="image/close.svg" class="app-icon" alt="Close"></button>
+        </div>
+
+        <div class="manual-search-row">
+          <svg class="manual-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input type="text" id="manualSearchInput" class="manual-search-input" placeholder="Search guides (e.g. kanban, mention, sprint, invite, drag, role)...">
+        </div>
+
+        <div class="manual-nav-pills" id="manualNavPills">
+          <button class="manual-nav-btn active" data-tab="quickstart">🚀 Quick Start</button>
+          <button class="manual-nav-btn" data-tab="projects">📋 Projects & Kanban</button>
+          <button class="manual-nav-btn" data-tab="tasks">💬 Tasks & Comments</button>
+          <button class="manual-nav-btn" data-tab="roles">👥 Roles & Permissions</button>
+          <button class="manual-nav-btn" data-tab="shortcuts">⚡ Tips & Shortcuts</button>
+        </div>
+
+        <div class="manual-body" id="manualBody">
+          <!-- Quick Start Tab -->
+          <div class="manual-tab-content" data-content="quickstart">
+            <div class="manual-card">
+              <div class="manual-card-header">
+                <div class="manual-card-icon">🚀</div>
+                <div>
+                  <h3 class="manual-card-title">Welcome to CLOVE — 4-Step Quick Start</h3>
+                  <div class="muted" style="font-size:11.5px;">Follow these easy steps to get productive immediately.</div>
+                </div>
+              </div>
+              <div class="manual-steps-list">
+                <div class="manual-step-item">
+                  <div class="manual-step-num">1</div>
+                  <div><strong>Select or Create a Project:</strong> Choose a project from the sidebar or click the orange <strong>+ Create</strong> button in the top navbar to create a new project with a unique key (e.g. <code>WEB</code>, <code>APP</code>).</div>
+                </div>
+                <div class="manual-step-item">
+                  <div class="manual-step-num">2</div>
+                  <div><strong>Add Your Tasks:</strong> Click <strong>+ New Task</strong> in any column or use <strong>+ Create</strong>. Set title, priority, due date, estimation in days, and assign team members.</div>
+                </div>
+                <div class="manual-step-item">
+                  <div class="manual-step-num">3</div>
+                  <div><strong>Work on the Kanban Board:</strong> Drag and drop task cards across columns (<em>To Do</em> → <em>In Progress</em> → <em>In Review</em> → <em>Done</em>) as work progresses.</div>
+                </div>
+                <div class="manual-step-item">
+                  <div class="manual-step-num">4</div>
+                  <div><strong>Collaborate in Real-Time:</strong> Open any task to post comments, attach images or logs, and type <code>@name</code> to mention teammates with automatic notifications.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Projects & Kanban Tab -->
+          <div class="manual-tab-content hidden" data-content="projects">
+            <div class="manual-card">
+              <div class="manual-card-header">
+                <div class="manual-card-icon">📊</div>
+                <div>
+                  <h3 class="manual-card-title">Project Views & Navigation</h3>
+                  <div class="muted" style="font-size:11.5px;">Switch views using the project header tabs.</div>
+                </div>
+              </div>
+              <div class="manual-feature-grid">
+                <div class="manual-feature-item">
+                  <strong>Dashboard</strong>
+                  Live Project Health score (0-100), sprint countdown, status distribution charts, and team workload table.
+                </div>
+                <div class="manual-feature-item">
+                  <strong>Kanban Board</strong>
+                  Visual workflow columns. Drag cards freely between columns to transition task states in real-time.
+                </div>
+                <div class="manual-feature-item">
+                  <strong>Backlog</strong>
+                  Prioritized flat list of upcoming items. Ideal for sprint planning and backlog grooming.
+                </div>
+                <div class="manual-feature-item">
+                  <strong>Timeline</strong>
+                  Visual Gantt schedule of all tasks based on start and due dates for milestone tracking.
+                </div>
+              </div>
+            </div>
+
+            <div class="manual-card">
+              <div class="manual-card-header">
+                <div class="manual-card-icon">🎯</div>
+                <div>
+                  <h3 class="manual-card-title">Sprint Dates & Board Controls</h3>
+                  <div class="muted" style="font-size:11.5px;">Keep your sprint on track with live indicators.</div>
+                </div>
+              </div>
+              <ul style="margin:0;padding-left:18px;font-size:12.5px;color:var(--text-secondary);line-height:1.6;">
+                <li><strong>Sprint Dates:</strong> Click <em>Sprint Dates</em> in the project header to set the start and end dates. The dashboard automatically calculates remaining days (e.g. <em>“3 days left”</em>, <em>“Ends today”</em>).</li>
+                <li><strong>Filtering:</strong> Use the board toolbar to filter tasks by priority (Urgent, High, Medium, Low) or by assignee.</li>
+                <li><strong>Group By:</strong> Toggle grouping by Assignee or Priority to analyze team bandwidth.</li>
+              </ul>
+            </div>
+          </div>
+
+          <!-- Tasks & Comments Tab -->
+          <div class="manual-tab-content hidden" data-content="tasks">
+            <div class="manual-card">
+              <div class="manual-card-header">
+                <div class="manual-card-icon">💬</div>
+                <div>
+                  <h3 class="manual-card-title">Comments, Mentions & Attachments</h3>
+                  <div class="muted" style="font-size:11.5px;">Collaborate seamlessly directly inside each task.</div>
+                </div>
+              </div>
+              <div class="manual-steps-list">
+                <div class="manual-step-item">
+                  <div class="manual-step-num">@</div>
+                  <div><strong>Smart @Mentions:</strong> Type <code>@</code> inside any comment or description to open user autocomplete. Use arrow keys and press <code>Enter</code> to tag a teammate. Tagged names appear as clean chips and send real-time alerts.</div>
+                </div>
+                <div class="manual-step-item">
+                  <div class="manual-step-num">📎</div>
+                  <div><strong>File Attachments:</strong> Click the paperclip icon to upload images, documents, or logs. Images feature rich inline previews with one-click downloads.</div>
+                </div>
+                <div class="manual-step-item">
+                  <div class="manual-step-num">🪄</div>
+                  <div><strong>Magic Text Improver:</strong> Click the wand icon next to the comment box to automatically correct spelling, format spacing, and capitalize your sentences!</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="manual-card">
+              <div class="manual-card-header">
+                <div class="manual-card-icon">📝</div>
+                <div>
+                  <h3 class="manual-card-title">Task Details & Estimations</h3>
+                  <div class="muted" style="font-size:11.5px;">Key fields on each task card.</div>
+                </div>
+              </div>
+              <div class="manual-feature-grid">
+                <div class="manual-feature-item">
+                  <strong>Priority Levels</strong>
+                  Urgent, High, Medium, and Low with distinct visual indicators.
+                </div>
+                <div class="manual-feature-item">
+                  <strong>Dates & Estimation</strong>
+                  Specify Start Date, Due Date, and Estimated Days for workload metrics.
+                </div>
+                <div class="manual-feature-item">
+                  <strong>Assignee</strong>
+                  Assign tasks to team members to reflect in their personal <em>For You</em> view.
+                </div>
+                <div class="manual-feature-item">
+                  <strong>Issue Types</strong>
+                  Categorize work as Bug, Feature, Task, or Improvement.
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Roles & Permissions Tab -->
+          <div class="manual-tab-content hidden" data-content="roles">
+            <div class="manual-card">
+              <div class="manual-card-header">
+                <div class="manual-card-icon">👥</div>
+                <div>
+                  <h3 class="manual-card-title">User Roles & Workspace Permissions</h3>
+                  <div class="muted" style="font-size:11.5px;">Permissions breakdown for team members.</div>
+                </div>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:10px;">
+                <div style="padding:10px;background:var(--bg-body);border-radius:var(--radius-sm);border:1px solid var(--border-subtle);">
+                  <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+                    <span class="manual-badge manual-badge-admin">Admin</span>
+                    <strong style="font-size:13px;">Full Workspace Administrator</strong>
+                  </div>
+                  <div style="font-size:12px;color:var(--text-secondary);line-height:1.4;">
+                    Can create & delete projects, delete tasks, invite new users with specific roles, edit sprint dates, and manage workflow statuses.
+                  </div>
+                </div>
+
+                <div style="padding:10px;background:var(--bg-body);border-radius:var(--radius-sm);border:1px solid var(--border-subtle);">
+                  <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+                    <span class="manual-badge manual-badge-member">Member / Developer</span>
+                    <strong style="font-size:13px;">Team Member</strong>
+                  </div>
+                  <div style="font-size:12px;color:var(--text-secondary);line-height:1.4;">
+                    Can view all assigned projects, create and update tasks, move tasks on the Kanban board, post comments, attach files, and log work hours.
+                  </div>
+                </div>
+
+                <div style="padding:10px;background:var(--bg-body);border-radius:var(--radius-sm);border:1px solid var(--border-subtle);">
+                  <strong style="font-size:13px;display:block;margin-bottom:4px;">✉️ Inviting New Users:</strong>
+                  <div style="font-size:12px;color:var(--text-secondary);line-height:1.4;">
+                    Admins can click <strong>Invite User</strong> in the sidebar, select the role, and generate a unique invitation link to share with new teammates.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Shortcuts & Tips Tab -->
+          <div class="manual-tab-content hidden" data-content="shortcuts">
+            <div class="manual-card">
+              <div class="manual-card-header">
+                <div class="manual-card-icon">⚡</div>
+                <div>
+                  <h3 class="manual-card-title">Keyboard Shortcuts & Efficiency Tips</h3>
+                  <div class="muted" style="font-size:11.5px;">Speed up your daily workflow with these handy shortcuts.</div>
+                </div>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:8px;">
+                <div class="manual-shortcut-row">
+                  <span>Focus Global Search bar</span>
+                  <span class="manual-key">/</span>
+                </div>
+                <div class="manual-shortcut-row">
+                  <span>Close any open modal or dialog</span>
+                  <span class="manual-key">Escape</span>
+                </div>
+                <div class="manual-shortcut-row">
+                  <span>Post comment (inside comment input)</span>
+                  <span class="manual-key">Enter</span>
+                </div>
+                <div class="manual-shortcut-row">
+                  <span>Navigate mention autocomplete</span>
+                  <span class="manual-key">↑ / ↓</span>
+                </div>
+                <div class="manual-shortcut-row">
+                  <span>Select highlighted mention</span>
+                  <span class="manual-key">Enter or Tab</span>
+                </div>
+                <div class="manual-shortcut-row">
+                  <span>Toggle Light / Dark Mode</span>
+                  <span style="font-size:12px;font-weight:600;color:var(--primary);">Profile Menu → Theme</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:16px;padding-top:12px;border-top:1px solid var(--border-subtle);">
+          <div class="muted" style="font-size:11.5px;">Tip: You can re-open this guide anytime via the <strong>?</strong> icon in the top bar.</div>
+          <button class="primary" onclick="closeModal()">Got it!</button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Attach tab switching handlers
+  const tabBtns = modalRoot.querySelectorAll(".manual-nav-btn");
+  const tabContents = modalRoot.querySelectorAll(".manual-tab-content");
+  const searchInput = byId("manualSearchInput");
+
+  function switchTab(tabName) {
+    tabBtns.forEach(b => {
+      if (b.dataset.tab === tabName) b.classList.add("active");
+      else b.classList.remove("active");
+    });
+    tabContents.forEach(c => {
+      if (c.dataset.content === tabName) c.classList.remove("hidden");
+      else c.classList.add("hidden");
+    });
+  }
+
+  tabBtns.forEach(btn => {
+    btn.onclick = () => {
+      if (searchInput) searchInput.value = "";
+      switchTab(btn.dataset.tab);
+    };
+  });
+
+  // Attach live search filter
+  if (searchInput) {
+    searchInput.oninput = () => {
+      const q = searchInput.value.toLowerCase().trim();
+      if (!q) {
+        const activeBtn = modalRoot.querySelector(".manual-nav-btn.active");
+        switchTab(activeBtn ? activeBtn.dataset.tab : "quickstart");
+        return;
+      }
+      // When searching, show all sections that match the query
+      tabContents.forEach(c => {
+        const text = c.innerText.toLowerCase();
+        if (text.includes(q)) {
+          c.classList.remove("hidden");
+        } else {
+          c.classList.add("hidden");
+        }
+      });
+    };
+  }
+
+  switchTab(initialTab);
+}
+
 function closeModal() {
   activeModalIssueId = null;
   if (modalCommentTimer) {
@@ -4412,6 +4785,294 @@ function closeModal() {
     modalCommentTimer = null;
   }
   byId("modal-root").innerHTML = "";
+}
+
+// ================= Interactive Onboarding Tour =================
+
+let currentTourStep = 0;
+let tourOverlayEl = null;
+
+const TOUR_STEPS = [
+  // --- PART 1: Top Navigation Bar (Image 2) ---
+  {
+    target: "#topbarSidebarToggle",
+    title: "Sidebar Toggle",
+    desc: "Collapse or expand the sidebar anytime to give your board and workspace full width.",
+    badge: "Top Bar • Navigation",
+    placement: "bottom"
+  },
+  {
+    target: "#navSearch",
+    title: "Global Search",
+    desc: "Search across tasks, projects, and team members instantly. Press / to jump directly into search.",
+    badge: "Top Bar • Search",
+    placement: "bottom"
+  },
+  {
+    target: "#createBtn",
+    title: "Quick Creation",
+    desc: "Create new tasks, report bugs, add feature requests, or launch new projects in seconds.",
+    badge: "Top Bar • Create",
+    placement: "bottom"
+  },
+  {
+    target: "#notifBtn",
+    title: "Live Notifications",
+    desc: "Stay notified whenever team members assign tasks to you, mention you in comments, or update task statuses.",
+    badge: "Top Bar • Notifications",
+    placement: "bottom"
+  },
+  {
+    target: "#profileBtn",
+    title: "Profile & Dark Mode",
+    desc: "View your account details, switch between Light and Dark themes, or manage your session.",
+    badge: "Top Bar • Profile",
+    placement: "bottom"
+  },
+
+  // --- PART 2: Sidebar Navigation (Image 3) ---
+  {
+    target: 'button[data-view="foryou"]',
+    title: "Home • For You",
+    desc: "Your personal cockpit showing all tasks assigned directly to you, recent progress, and priorities.",
+    badge: "Sidebar • Home",
+    placement: "right"
+  },
+  {
+    target: 'button[data-view="recent"]',
+    title: "Recent Items",
+    desc: "Quickly access tasks and projects you visited or modified recently.",
+    badge: "Sidebar • Recent",
+    placement: "right"
+  },
+  {
+    target: 'button[data-view="starred"]',
+    title: "Starred Favorites",
+    desc: "Keep your most critical tasks and high-priority tickets pinned in one easy-to-find place.",
+    badge: "Sidebar • Starred",
+    placement: "right"
+  },
+  {
+    target: 'button[data-view="projects"]',
+    title: "All Projects",
+    desc: "Browse and manage all team projects, agile Kanban sprint boards, task backlogs, and timelines.",
+    badge: "Sidebar • Projects",
+    placement: "right"
+  },
+  {
+    target: 'button[data-view="team"]',
+    title: "Team & Invite",
+    desc: "Collaborate with your team, view roles, and invite new colleagues to the workspace.",
+    badge: "Sidebar • Team",
+    placement: "right"
+  },
+  {
+    target: "#sidebarManualBtn",
+    title: "Documentation & Guides",
+    desc: "Access complete workflows, keyboard shortcuts, and feature guides anytime in the user documentation.",
+    badge: "Sidebar • Help",
+    placement: "right"
+  }
+];
+
+function closeOnboardingTour(markSeen = true) {
+  if (tourOverlayEl) {
+    tourOverlayEl.remove();
+    tourOverlayEl = null;
+  }
+  window.removeEventListener("resize", updateTourPosition);
+  window.removeEventListener("keydown", handleTourKeyDown);
+  if (markSeen) {
+    localStorage.setItem("clove_tour_seen", "true");
+    if (currentUser && (currentUser.id || currentUser.email)) {
+      localStorage.setItem("clove_tour_seen_" + (currentUser.id || currentUser.email), "true");
+    }
+    localStorage.removeItem("clove_new_user_guide_pending");
+  }
+}
+
+function handleTourKeyDown(e) {
+  if (e.key === "Escape") {
+    closeOnboardingTour(true);
+  } else if (e.key === "ArrowRight") {
+    if (currentTourStep < TOUR_STEPS.length - 1) {
+      goToTourStep(currentTourStep + 1);
+    } else {
+      closeOnboardingTour(true);
+    }
+  } else if (e.key === "ArrowLeft") {
+    if (currentTourStep > 0) {
+      goToTourStep(currentTourStep - 1);
+    }
+  }
+}
+
+function updateTourPosition() {
+  if (!tourOverlayEl) return;
+  const step = TOUR_STEPS[currentTourStep];
+  if (!step) return;
+
+  const targetEl = document.querySelector(step.target);
+  const spotlight = tourOverlayEl.querySelector(".tour-spotlight");
+  const card = tourOverlayEl.querySelector(".tour-card");
+
+  if (!spotlight || !card) return;
+
+  const winW = window.innerWidth;
+  const winH = window.innerHeight;
+  const cardWidth = 320;
+
+  if (!targetEl || targetEl.offsetParent === null) {
+    // If element is not rendered on this view, seamlessly skip to next step
+    if (currentTourStep < TOUR_STEPS.length - 1) {
+      goToTourStep(currentTourStep + 1);
+    } else {
+      closeOnboardingTour(true);
+    }
+    return;
+  }
+
+  const rect = targetEl.getBoundingClientRect();
+  const padX = 6;
+  const padY = 6;
+
+  // Spotlight position
+  spotlight.style.top = `${Math.max(0, rect.top - padY)}px`;
+  spotlight.style.left = `${Math.max(0, rect.left - padX)}px`;
+  spotlight.style.width = `${Math.max(20, rect.width + padX * 2)}px`;
+  spotlight.style.height = `${Math.max(20, rect.height + padY * 2)}px`;
+
+  // Guide card position
+  const cardHeight = Math.max(card.offsetHeight || 0, 200);
+  let top = 0;
+  let left = 0;
+
+  if (step.placement === "right") {
+    left = rect.right + 16;
+    // Align with target top, shifting up if near the bottom of viewport
+    top = rect.top;
+    if (top + cardHeight > winH - 24) {
+      top = Math.max(16, winH - cardHeight - 24);
+    }
+    if (left + cardWidth > winW - 16) {
+      left = Math.max(16, winW - cardWidth - 16);
+      top = Math.max(16, rect.top - cardHeight - 12);
+    }
+  } else {
+    // Bottom placement
+    top = rect.bottom + 12;
+    left = rect.left + (rect.width / 2) - (cardWidth / 2);
+
+    // Clamp horizontal bounds
+    if (left < 16) left = 16;
+    if (left + cardWidth > winW - 16) left = winW - cardWidth - 16;
+
+    // Flip to top if overflowing window bottom
+    if (top + cardHeight > winH - 24) {
+      top = Math.max(16, rect.top - cardHeight - 12);
+    }
+  }
+
+  // Universal viewport safety clamp
+  if (top + cardHeight > winH - 20) {
+    top = Math.max(16, winH - cardHeight - 20);
+  }
+  if (top < 16) top = 16;
+  if (left < 16) left = 16;
+  if (left + cardWidth > winW - 16) left = Math.max(16, winW - cardWidth - 16);
+
+  card.style.top = `${top}px`;
+  card.style.left = `${left}px`;
+}
+
+function goToTourStep(index) {
+  currentTourStep = Math.max(0, Math.min(index, TOUR_STEPS.length - 1));
+  renderTourStep();
+}
+
+function renderTourStep() {
+  if (!tourOverlayEl) return;
+  const step = TOUR_STEPS[currentTourStep];
+  const total = TOUR_STEPS.length;
+  const isFirst = currentTourStep === 0;
+  const isLast = currentTourStep === total - 1;
+
+  // If entering sidebar items, ensure sidebar is expanded
+  if (step.placement === "right" && sidebarCollapsed) {
+    updateSidebarState(false);
+  }
+
+  const dotsHtml = TOUR_STEPS.map((_, i) => `<span class="tour-dot ${i === currentTourStep ? "active" : ""}"></span>`).join("");
+
+  const card = tourOverlayEl.querySelector(".tour-card");
+  if (!card) return;
+
+  card.innerHTML = `
+    <div class="tour-badge-row">
+      <span class="tour-step-badge">${step.badge || `Step ${currentTourStep + 1} of ${total}`}</span>
+      <button class="tour-close-btn" id="tourCloseBtn" title="Close guide">&times;</button>
+    </div>
+    <div class="tour-title">${esc(step.title)}</div>
+    <div class="tour-desc">${esc(step.desc)}</div>
+    <div class="tour-footer">
+      <div class="tour-progress-dots">${dotsHtml}</div>
+      <div class="tour-actions">
+        ${!isFirst ? `<button class="tour-btn tour-btn-prev" id="tourPrevBtn">Back</button>` : `<button class="tour-skip-link" id="tourSkipBtn">Skip</button>`}
+        <button class="tour-btn tour-btn-next" id="tourNextBtn">${isLast ? "Done" : "Next"}</button>
+      </div>
+    </div>
+  `;
+
+  // Attach card events
+  const closeBtn = card.querySelector("#tourCloseBtn");
+  if (closeBtn) closeBtn.onclick = () => closeOnboardingTour(true);
+
+  const skipBtn = card.querySelector("#tourSkipBtn");
+  if (skipBtn) skipBtn.onclick = () => closeOnboardingTour(true);
+
+  const prevBtn = card.querySelector("#tourPrevBtn");
+  if (prevBtn) prevBtn.onclick = () => goToTourStep(currentTourStep - 1);
+
+  const nextBtn = card.querySelector("#tourNextBtn");
+  if (nextBtn) {
+    nextBtn.onclick = () => {
+      if (isLast) {
+        closeOnboardingTour(true);
+        showToast("You're all set! Enjoy using CLOVE.", "success");
+      } else {
+        goToTourStep(currentTourStep + 1);
+      }
+    };
+  }
+
+  requestAnimationFrame(() => {
+    updateTourPosition();
+  });
+}
+
+function startOnboardingTour(stepIndex = 0) {
+  closeOnboardingTour(false);
+
+  tourOverlayEl = document.createElement("div");
+  tourOverlayEl.className = "tour-overlay-container";
+  tourOverlayEl.innerHTML = `
+    <div class="tour-backdrop-click" id="tourBackdropClick"></div>
+    <div class="tour-spotlight"></div>
+    <div class="tour-card" id="tourCard"></div>
+  `;
+
+  document.body.appendChild(tourOverlayEl);
+
+  const backdrop = tourOverlayEl.querySelector("#tourBackdropClick");
+  if (backdrop) {
+    backdrop.onclick = () => closeOnboardingTour(true);
+  }
+
+  window.addEventListener("resize", updateTourPosition);
+  window.addEventListener("keydown", handleTourKeyDown);
+
+  currentTourStep = stepIndex;
+  renderTourStep();
 }
 
 // ================= Boot =================
