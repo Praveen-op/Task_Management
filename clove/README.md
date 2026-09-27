@@ -38,7 +38,7 @@ Browser -> HTML/CSS/JavaScript -> REST API -> FastAPI -> PyMongo -> MongoDB
 ## Requirements
 
 - Python 3.10+
-- MongoDB running locally on port 27017
+- MongoDB running
 - A modern browser
 
 ## Run Backend
@@ -49,26 +49,12 @@ pip install -r requirements.txt
 copy .env.example .env
 uvicorn app.main:app --reload
 
-Backend:
-http://127.0.0.1:8000
-
-API docs:
-http://127.0.0.1:8000/docs
-
 ## Run Frontend
 python -m http.server 5500
-
-Then open:
-http://127.0.0.1:5500
-
-The frontend expects the FastAPI backend at:
-http://127.0.0.1:8000
 
 ## MongoDB
 
 Default connection:
-
-mongodb://localhost:27017
 
 The backend can be built and run as a standalone container using Docker:
 
