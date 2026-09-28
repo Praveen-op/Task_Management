@@ -29,7 +29,22 @@ async function api(path, options = {}) {
   const headers = {"Content-Type": "application/json", ...(options.headers || {})};
   const token = localStorage.getItem("clove_token");
   if (token) headers.Authorization = `Bearer ${token}`;
-  const response = await fetch(API_BASE + path, {...options, headers});
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), options.timeout || 25000);
+
+  let response;
+  try {
+    response = await fetch(API_BASE + path, {...options, headers, signal: controller.signal});
+  } catch (netErr) {
+    if (netErr.name === "AbortError") {
+      throw new Error("Request timed out. Please ensure FastAPI backend is running on port 8000.");
+    }
+    throw new Error(`Cannot connect to backend (${API_BASE}). Is the backend server running?`);
+  } finally {
+    clearTimeout(timeoutId);
+  }
+
   let data = {};
   try { data = await response.json(); } catch {}
   if (response.status === 401) {

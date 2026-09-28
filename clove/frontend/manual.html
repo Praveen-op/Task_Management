@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CLOVE — Documentation</title>
+  <title>CLOVE - Documentation</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="icon" type="image/svg+xml" href="image/files/clove-orange-icon.svg">
   <script>(function(){const t=localStorage.getItem("clove_theme")||(window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light");document.documentElement.setAttribute("data-theme",t);})();</script>
-  <link rel="stylesheet" href="css/style.css?v=11.3">
+  <link rel="stylesheet" href="css/style.css?v=41.0">
   <style>
     body.manual-page {
       background: var(--bg-body);
@@ -206,11 +206,19 @@
       border: 1px solid var(--border-subtle);
     }
 
-    .manual-box strong {
+    .manual-box > strong:first-child {
       display: block;
       color: var(--text-primary);
       font-size: 13.5px;
       margin-bottom: 6px;
+    }
+
+    .manual-box p strong,
+    .manual-box li strong {
+      display: inline;
+      font-size: inherit;
+      color: var(--text-primary);
+      margin: 0;
     }
 
     .manual-box p {
@@ -218,6 +226,18 @@
       font-size: 12.5px;
       color: var(--text-secondary);
       line-height: 1.5;
+    }
+
+    .manual-box ul {
+      margin: 8px 0 0 0;
+      padding-left: 18px;
+      font-size: 12px;
+      color: var(--text-secondary);
+      line-height: 1.6;
+    }
+
+    .manual-box li {
+      margin-bottom: 3px;
     }
 
     .manual-table {
@@ -298,7 +318,7 @@
           <circle cx="11" cy="11" r="8"></circle>
           <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
         </svg>
-        <input type="text" id="manualDocSearch" placeholder="Search guides & shortcuts…">
+        <input type="text" id="manualDocSearch" placeholder="Search guides & shortcuts...">
       </div>
 
       <button type="button" class="theme-toggle-btn" id="manualThemeBtn" style="padding:6px 12px;font-size:12px;">
@@ -306,7 +326,7 @@
       </button>
 
       <a href="index.html" class="primary" style="text-decoration:none;padding:7px 14px;font-size:12.5px;font-weight:600;border-radius:var(--radius-pill);display:inline-flex;align-items:center;gap:6px;">
-        Go to Dashboard →
+        Go to Dashboard
       </a>
     </div>
   </header>
@@ -314,19 +334,20 @@
   <div class="manual-container">
     <aside class="manual-sidebar">
       <ul class="manual-nav-list">
-        <li><a href="#getting-started" class="manual-nav-link active">🚀 1. Getting Started</a></li>
-        <li><a href="#projects-workspaces" class="manual-nav-link">📁 2. Projects & Workspaces</a></li>
-        <li><a href="#tasks-kanban" class="manual-nav-link">📋 3. Tasks & Kanban Board</a></li>
-        <li><a href="#collaboration" class="manual-nav-link">💬 4. Team Collaboration</a></li>
-        <li><a href="#roles-permissions" class="manual-nav-link">👥 5. Roles & Administration</a></li>
-        <li><a href="#shortcuts-tips" class="manual-nav-link">⚡ 6. Shortcuts & Tips</a></li>
+        <li><a href="#getting-started" class="manual-nav-link active">1. Getting Started</a></li>
+        <li><a href="#projects-workspaces" class="manual-nav-link">2. Projects & Workspaces</a></li>
+        <li><a href="#tasks-kanban" class="manual-nav-link">3. Tasks & Kanban Board</a></li>
+        <li><a href="#collaboration" class="manual-nav-link">4. Team Collaboration</a></li>
+        <li><a href="#roles-permissions" class="manual-nav-link">5. Roles & Administration</a></li>
+        <li><a href="#clovia-ai" class="manual-nav-link">6. Clovia AI Assistant</a></li>
+        <li><a href="#shortcuts-tips" class="manual-nav-link">7. Shortcuts & Tips</a></li>
       </ul>
     </aside>
 
     <main class="manual-main">
       <!-- Section 1 -->
       <section id="getting-started" class="manual-section">
-        <h2 class="manual-section-title">🚀 1. Getting Started</h2>
+        <h2 class="manual-section-title">1. Getting Started</h2>
         <div class="manual-section-sub">Quick overview of accounts, navigation, and workspace preferences.</div>
 
         <div class="manual-steps-list">
@@ -356,24 +377,24 @@
 
       <!-- Section 2 -->
       <section id="projects-workspaces" class="manual-section">
-        <h2 class="manual-section-title">📁 2. Projects & Workspaces</h2>
+        <h2 class="manual-section-title">2. Projects & Workspaces</h2>
         <div class="manual-section-sub">Organize your team's initiatives with specialized project views and sprint tracking.</div>
 
         <div class="manual-grid">
           <div class="manual-box">
-            <strong>📊 Dashboard View</strong>
+            <strong>Dashboard View</strong>
             <p>Real-time Project Health score (0-100), sprint countdown indicators, status distributions, team workload analysis, and overdue task radars.</p>
           </div>
           <div class="manual-box">
-            <strong>📋 Kanban Board</strong>
+            <strong>Kanban Board</strong>
             <p>Visual workflow columns (To Do, In Progress, In Review, Done). Drag cards freely between columns to transition statuses instantly.</p>
           </div>
           <div class="manual-box">
-            <strong>📑 Backlog View</strong>
+            <strong>Backlog View</strong>
             <p>Prioritized flat list of tasks for sprint planning, bulk status updates, and backlog grooming.</p>
           </div>
           <div class="manual-box">
-            <strong>📅 Timeline (Gantt)</strong>
+            <strong>Timeline (Gantt)</strong>
             <p>Visual schedule showing task durations based on start and due dates for milestone and release tracking.</p>
           </div>
         </div>
@@ -386,7 +407,7 @@
 
       <!-- Section 3 -->
       <section id="tasks-kanban" class="manual-section">
-        <h2 class="manual-section-title">📋 3. Task Management & Kanban Board</h2>
+        <h2 class="manual-section-title">3. Task Management & Kanban Board</h2>
         <div class="manual-section-sub">Create, prioritize, assign, and track work smoothly.</div>
 
         <div class="manual-grid">
@@ -411,33 +432,33 @@
 
       <!-- Section 4 -->
       <section id="collaboration" class="manual-section">
-        <h2 class="manual-section-title">💬 4. Team Collaboration & Comments</h2>
+        <h2 class="manual-section-title">4. Team Collaboration & Comments</h2>
         <div class="manual-section-sub">Communicate effectively within tasks using mentions, attachments, and writing tools.</div>
 
         <div class="manual-steps-list">
           <div class="manual-step-item">
-            <div class="manual-step-num">@</div>
+            <div class="manual-step-num">1</div>
             <div>
               <strong>Smart @Mentions:</strong>
               Type <span class="manual-tag-chip">@</span> in the comment input to open user autocomplete. Use arrow keys and press <code>Enter</code> to tag a teammate. Tagged members receive instant notifications.
             </div>
           </div>
           <div class="manual-step-item">
-            <div class="manual-step-num">📎</div>
+            <div class="manual-step-num">2</div>
             <div>
               <strong>Attachments & Screenshots:</strong>
               Click the paperclip button to attach images or logs. Image attachments display inline thumbnails with full-size download links.
             </div>
           </div>
           <div class="manual-step-item">
-            <div class="manual-step-num">🪄</div>
+            <div class="manual-step-num">3</div>
             <div>
               <strong>Magic Text Improver:</strong>
               Click the wand icon next to any comment or description field to automatically correct spelling, polish punctuation, and capitalize sentences.
             </div>
           </div>
           <div class="manual-step-item">
-            <div class="manual-step-num">🔔</div>
+            <div class="manual-step-num">4</div>
             <div>
               <strong>Notifications:</strong>
               The bell icon in the top navbar displays a badge whenever you are assigned a task or mentioned. Click any alert to open the task directly.
@@ -448,7 +469,7 @@
 
       <!-- Section 5 -->
       <section id="roles-permissions" class="manual-section">
-        <h2 class="manual-section-title">👥 5. User Roles & Administration</h2>
+        <h2 class="manual-section-title">5. User Roles & Administration</h2>
         <div class="manual-section-sub">Permissions and capabilities for different workspace roles.</div>
 
         <table class="manual-table">
@@ -463,45 +484,45 @@
           <tbody>
             <tr>
               <td>View Projects & Tasks</td>
-              <td>✅ Yes</td>
-              <td>✅ Yes</td>
-              <td>✅ Yes</td>
+              <td>Yes</td>
+              <td>Yes</td>
+              <td>Yes</td>
             </tr>
             <tr>
               <td>Drag & Drop Kanban Statuses</td>
-              <td>✅ Yes</td>
-              <td>✅ Yes</td>
-              <td>✅ Yes</td>
+              <td>Yes</td>
+              <td>Yes</td>
+              <td>Yes</td>
             </tr>
             <tr>
               <td>Add Comments, @Mentions & Files</td>
-              <td>✅ Yes</td>
-              <td>✅ Yes</td>
-              <td>✅ Yes</td>
+              <td>Yes</td>
+              <td>Yes</td>
+              <td>Yes</td>
             </tr>
             <tr>
               <td>Create / Delete Projects</td>
-              <td>✅ Yes</td>
-              <td>❌ No</td>
-              <td>❌ No</td>
+              <td>Yes</td>
+              <td>No</td>
+              <td>No</td>
             </tr>
             <tr>
               <td>Delete Tasks</td>
-              <td>✅ Yes</td>
-              <td>❌ No</td>
-              <td>❌ No</td>
+              <td>Yes</td>
+              <td>No</td>
+              <td>No</td>
             </tr>
             <tr>
               <td>Invite New Team Members</td>
-              <td>✅ Yes</td>
-              <td>❌ No</td>
-              <td>❌ No</td>
+              <td>Yes</td>
+              <td>No</td>
+              <td>No</td>
             </tr>
             <tr>
               <td>Configure Sprint Dates</td>
-              <td>✅ Yes</td>
-              <td>❌ No</td>
-              <td>❌ No</td>
+              <td>Yes</td>
+              <td>No</td>
+              <td>No</td>
             </tr>
           </tbody>
         </table>
@@ -512,11 +533,78 @@
       </section>
 
       <!-- Section 6 -->
+      <section id="clovia-ai" class="manual-section">
+        <h2 class="manual-section-title">6. Clovia AI Workspace Assistant</h2>
+        <div class="manual-section-sub">Autonomous AI engine for scaffolding projects, breaking down tasks, assigning team members, and automating board workflows.</div>
+
+        <div class="manual-grid">
+          <div class="manual-box">
+            <strong>Natural Language Actions</strong>
+            <p>Tell Clovia what to do in plain English. Scaffold new projects with sprint tasks, create prioritized tickets, assign colleagues, or transition board columns instantly.</p>
+          </div>
+          <div class="manual-box">
+            <strong>Multi-Model AI Connector</strong>
+            <p>Connect your preferred LLM engine:</p>
+            <ul>
+              <li><strong>DeepSeek</strong> (V3 / R1)</li>
+              <li><strong>Google Gemini</strong> (1.5 / 2.0)</li>
+              <li><strong>OpenAI</strong> (GPT-4o)</li>
+              <li><strong>Anthropic Claude</strong> (3.5 Sonnet)</li>
+            </ul>
+          </div>
+          <div class="manual-box">
+            <strong>Encrypted MongoDB Vault</strong>
+            <p>Your API keys are encrypted on the backend using <strong>ChaCha20-Poly1305</strong> and stored securely in MongoDB. Keys are never saved in cookies, local storage, or exposed to clients.</p>
+          </div>
+          <div class="manual-box">
+            <strong>Quick Access Shortcut</strong>
+            <p>Open Clovia anytime by clicking the floating orange icon in the bottom-right corner or pressing <span class="manual-tag-chip">Ctrl + J</span> anywhere inside the application.</p>
+          </div>
+        </div>
+
+        <h3 style="font-size:15px;font-weight:700;margin:22px 0 8px;color:var(--text-primary);">Example Commands & Capabilities</h3>
+        <table class="manual-table">
+          <thead>
+            <tr>
+              <th style="width:50%;">What to Say</th>
+              <th>Action Performed</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>Create project Mobile Banking key BANK with tasks: - Auth - Dashboard UI - Payment API</code></td>
+              <td>Creates a new project named "Mobile Banking" with key <code>BANK</code> and populates the 3 sprint tasks automatically.</td>
+            </tr>
+            <tr>
+              <td><code>Create high priority task 'Fix session timeout' and assign to me</code></td>
+              <td>Creates a task with High priority, generates description, and assigns directly to your user.</td>
+            </tr>
+            <tr>
+              <td><code>Move BANK-1 to In Progress</code> (or <code>Move TSK-2 to Done</code>)</td>
+              <td>Instantly updates the Kanban column of the specified task with live board sync.</td>
+            </tr>
+            <tr>
+              <td><code>Add 3 sprint tasks: Unit Tests, Swagger Docs, Performance Audit</code></td>
+              <td>Batch generates multiple prioritized tasks into the currently active project.</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="manual-callout">
+          <strong>Configuring Your Engine:</strong> Clovia operates exclusively via cloud LLM APIs. Open Clovia (<span class="manual-tag-chip">Ctrl + J</span>), click the <strong>Connector</strong> button in the header, choose your provider (DeepSeek, Gemini, OpenAI, or Claude), paste your API key, and click <strong>Save Key</strong>.
+        </div>
+      </section>
+
+      <!-- Section 7 -->
       <section id="shortcuts-tips" class="manual-section">
-        <h2 class="manual-section-title">⚡ 6. Shortcuts & Productivity Tips</h2>
+        <h2 class="manual-section-title">7. Shortcuts & Productivity Tips</h2>
         <div class="manual-section-sub">Handy keyboard shortcuts to navigate faster.</div>
 
         <div style="display:flex;flex-direction:column;gap:8px;margin-top:14px;">
+          <div class="manual-shortcut-row">
+            <span>Toggle Clovia AI Assistant</span>
+            <span class="manual-key">Ctrl + J</span>
+          </div>
           <div class="manual-shortcut-row">
             <span>Focus Global Search</span>
             <span class="manual-key">/</span>
@@ -531,7 +619,7 @@
           </div>
           <div class="manual-shortcut-row">
             <span>Navigate @mention autocomplete</span>
-            <span class="manual-key">↑ / ↓</span>
+            <span class="manual-key">Up / Down</span>
           </div>
           <div class="manual-shortcut-row">
             <span>Select highlighted @mention</span>
@@ -539,7 +627,7 @@
           </div>
           <div class="manual-shortcut-row">
             <span>Toggle Theme</span>
-            <span style="font-size:12px;font-weight:600;color:var(--primary);">Profile Menu → Theme</span>
+            <span style="font-size:12px;font-weight:600;color:var(--primary);">Profile Menu &gt; Theme</span>
           </div>
         </div>
       </section>

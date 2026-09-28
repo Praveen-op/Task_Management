@@ -3,6 +3,7 @@ from bson import ObjectId
 from ..database import users_collection, invitations_collection
 from ..schemas import SignupRequest, LoginRequest
 from ..security import hash_password, verify_password, create_access_token
+from ..dependencies import current_user
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 

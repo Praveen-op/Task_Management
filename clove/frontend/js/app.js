@@ -489,6 +489,7 @@ function shell() {
             <div class="dropdown-list">
               <button id="createProjectOpt"><img src="image/folder-plus.svg" class="app-icon menu-icon" alt=""> New Project</button>
               <button id="createTaskOpt"><img src="image/task.svg" class="app-icon menu-icon" alt=""> New Task</button>
+              <button id="createAiOpt"><img src="image/files/microphone_icon_orange.svg" style="width:16px;height:16px;border-radius:3px;vertical-align:middle;margin-right:6px;" alt=""> Ask Clovia</button>
             </div>
           </div>
         </div>
@@ -574,12 +575,54 @@ function shell() {
     </div>
 
     <div id="modal-root"></div>
+    <button class="ai-fab-btn" id="aiFloatingBtn" title="Clovia (Ctrl+J)" aria-label="Open Clovia">
+      <span class="ai-fab-wave"></span>
+      <span class="ai-fab-wave"></span>
+      <span class="ai-fab-wave"></span>
+      <img src="image/files/microphone_icon_orange.svg" class="ai-fab-icon-img" alt="Clovia">
+    </button>
   </div>`;
 
   setupShellHandlers();
 }
 
+function ensureAiFloatingBtn() {
+  let aiFab = byId("aiFloatingBtn");
+  if (!aiFab) {
+    aiFab = document.createElement("button");
+    aiFab.className = "ai-fab-btn";
+    aiFab.id = "aiFloatingBtn";
+    aiFab.title = "Clovia (Ctrl+J)";
+    aiFab.setAttribute("aria-label", "Open Clovia");
+    aiFab.innerHTML = `
+      <span class="ai-fab-wave"></span>
+      <span class="ai-fab-wave"></span>
+      <span class="ai-fab-wave"></span>
+      <img src="image/files/microphone_icon_orange.svg" class="ai-fab-icon-img" alt="Clovia">
+    `;
+    document.body.appendChild(aiFab);
+  }
+  aiFab.onclick = (e) => {
+    if (e) e.stopPropagation();
+    const existingOverlay = byId("aiCopilotOverlay");
+    if (existingOverlay) {
+      const panel = byId("aiSidePanel");
+      if (panel) {
+        panel.style.animation = "aiPanelSlideOut 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards";
+        existingOverlay.style.animation = "modalFadeOut 0.22s ease-out forwards";
+        setTimeout(() => closeModal(), 200);
+      } else {
+        closeModal();
+      }
+    } else {
+      openAiCopilotModal();
+    }
+  };
+}
+
 function setupShellHandlers() {
+  ensureAiFloatingBtn();
+
   byId("logoutBtn").onclick = () => {
     disconnectProjectWebSocket();
     stopProjectPolling();
@@ -607,6 +650,8 @@ function setupShellHandlers() {
   byId("createBtn").onclick = (e) => { e.stopPropagation(); closeAllDropdowns(createMenu); createMenu.classList.toggle("hidden"); };
   byId("createProjectOpt").onclick = () => { createMenu.classList.add("hidden"); openProjectModal(); };
   byId("createTaskOpt").onclick = () => { createMenu.classList.add("hidden"); openIssueModal(); };
+  const createAiOpt = byId("createAiOpt");
+  if (createAiOpt) createAiOpt.onclick = () => { createMenu.classList.add("hidden"); openAiCopilotModal(); };
   byId("sidebarInviteBtn").onclick = () => openInviteModal();
 
   // Notifications
@@ -2847,6 +2892,686 @@ function openSettingsModal() {
   };
 }
 
+// ================= AI Engine Configuration & Connector =================
+const AI_PROVIDERS = {
+  gemini: {
+    name: "Google Gemini",
+    tag: "✨ Gemini",
+    sub: "Gemini 1.5 & 2.0 (Recommended & Free tier)",
+    placeholder: "Paste your Gemini API key (AIzaSy...)"
+  },
+  deepseek: {
+    name: "DeepSeek",
+    tag: "🐋 DeepSeek",
+    sub: "DeepSeek-V3 / R1 (Fast reasoning)",
+    placeholder: "Paste your DeepSeek API key (sk-...)"
+  },
+  openai: {
+    name: "OpenAI",
+    tag: "🤖 OpenAI",
+    sub: "GPT-4o & GPT-4o-mini",
+    placeholder: "Paste your OpenAI API key (sk-...)"
+  },
+  claude: {
+    name: "Anthropic Claude",
+    tag: "🎭 Claude",
+    sub: "Claude 3.5 Sonnet",
+    placeholder: "Paste your Claude API key (sk-ant-...)"
+  }
+};
+
+let aiChatMessages = window._cloveAiChatMessages || [];
+window._cloveAiChatMessages = aiChatMessages;
+let aiMongoKeysCache = { configured: {}, masked_keys: {} };
+
+// Helper to load MongoDB keys cache
+async function fetchAiKeysStatus() {
+  try {
+    const res = await api("/ai/keys");
+    if (res && res.success) {
+      aiMongoKeysCache = res;
+    }
+  } catch (_) {}
+  return aiMongoKeysCache;
+}
+
+// ================= Dedicated "Connector" Modal =================
+// Standalone module dedicated exclusively to managing and testing API keys
+function openAiConnectorModal(onUpdatedCallback) {
+  // Wipe any legacy keys from browser localStorage
+  ["gemini", "deepseek", "openai", "claude"].forEach(p => localStorage.removeItem("clove_ai_key_" + p));
+  localStorage.removeItem("clove_vault_seed");
+
+  let currentTab = localStorage.getItem("clove_ai_provider") || "deepseek";
+  if (!AI_PROVIDERS[currentTab]) currentTab = "deepseek";
+
+  // Remove any existing connector overlay
+  const existing = document.getElementById("aiConnectorOverlay");
+  if (existing) existing.remove();
+
+  const overlay = document.createElement("div");
+  overlay.className = "ai-connector-overlay";
+  overlay.id = "aiConnectorOverlay";
+
+  const renderConnectorUI = () => {
+    const meta = AI_PROVIDERS[currentTab];
+    const isConfigured = Boolean(aiMongoKeysCache.configured && aiMongoKeysCache.configured[currentTab]);
+    const masked = (aiMongoKeysCache.masked_keys && aiMongoKeysCache.masked_keys[currentTab]) || "";
+    const activeProvider = localStorage.getItem("clove_ai_provider") || "deepseek";
+    const isActiveEngine = (activeProvider === currentTab);
+
+    overlay.innerHTML = `
+      <div class="ai-connector-dialog" id="aiConnectorDialog">
+        <div class="ai-connector-head">
+          <div class="ai-connector-head-left">
+            <div class="ai-connector-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 22v-5"/>
+                <path d="M9 8V2"/>
+                <path d="M15 8V2"/>
+                <path d="M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8Z"/>
+              </svg>
+            </div>
+            <div>
+              <h3>AI Connector</h3>
+              <p>Connect your AI engine & API keys</p>
+            </div>
+          </div>
+          <button type="button" class="close" id="aiConnCloseBtn" title="Close"><img src="image/close.svg" class="app-icon" alt="Close"></button>
+        </div>
+
+        <div class="ai-connector-tabs" id="aiConnTabs">
+          ${Object.keys(AI_PROVIDERS).map(pKey => {
+            const hasKey = Boolean(aiMongoKeysCache.configured && aiMongoKeysCache.configured[pKey]);
+            return `
+              <button type="button" class="ai-conn-tab-btn ${pKey === currentTab ? 'active' : ''}" data-provider="${pKey}">
+                ${AI_PROVIDERS[pKey].tag}
+                ${hasKey ? '<span class="ai-conn-dot" title="Connected"></span>' : ''}
+              </button>
+            `;
+          }).join("")}
+        </div>
+
+        <div class="ai-connector-body">
+          <div class="ai-provider-hero-card">
+            <div class="ai-hero-info">
+              <div class="ai-hero-title">${meta.tag}</div>
+              <div class="ai-hero-sub">${esc(meta.sub)}</div>
+            </div>
+            <div class="ai-hero-status-wrap">
+              ${isConfigured 
+                ? (isActiveEngine 
+                    ? `<span class="ai-active-engine-chip">✓ Active</span>` 
+                    : `<button type="button" class="ai-btn-set-active" id="aiConnSetActiveBtn">Set Active</button>`)
+                : `<span class="ai-conn-status-pill disconnected">Not Connected</span>`}
+            </div>
+          </div>
+
+          <div class="ai-connector-input-row">
+            <div class="ai-connector-input-wrap">
+              <input type="text" class="ai-connector-input" id="aiConnKeyInput" placeholder="${isConfigured ? masked : meta.placeholder}" value="" autocomplete="off" spellcheck="false">
+            </div>
+            <button type="button" class="ai-connector-btn-save" id="aiConnSaveBtn">Save Key</button>
+            ${isConfigured ? `<button type="button" class="ai-connector-btn-clear" id="aiConnClearBtn">Clear</button>` : ''}
+          </div>
+        </div>
+
+        <div class="ai-connector-foot">
+          <button type="button" class="primary" id="aiConnDoneBtn">Done</button>
+        </div>
+      </div>
+    `;
+
+    // Bind Close
+    const closeDialog = () => {
+      overlay.style.animation = "modalFadeOut 0.18s ease-out forwards";
+      setTimeout(() => overlay.remove(), 160);
+      if (typeof onUpdatedCallback === "function") {
+        onUpdatedCallback(localStorage.getItem("clove_ai_provider") || "deepseek", aiMongoKeysCache);
+      }
+    };
+
+    overlay.querySelector("#aiConnCloseBtn").onclick = closeDialog;
+    overlay.querySelector("#aiConnDoneBtn").onclick = closeDialog;
+    overlay.onclick = (e) => {
+      if (e.target === overlay) closeDialog();
+    };
+
+    // Bind Tabs
+    overlay.querySelectorAll(".ai-conn-tab-btn").forEach(btn => {
+      btn.onclick = () => {
+        currentTab = btn.dataset.provider;
+        renderConnectorUI();
+      };
+    });
+
+    // Set Active Engine
+    const setActiveBtn = overlay.querySelector("#aiConnSetActiveBtn");
+    if (setActiveBtn) {
+      setActiveBtn.onclick = () => {
+        localStorage.setItem("clove_ai_provider", currentTab);
+        showToast(`${meta.name} set as active Clovia engine!`, "success");
+        renderConnectorUI();
+        if (typeof onUpdatedCallback === "function") {
+          onUpdatedCallback(currentTab, aiMongoKeysCache);
+        }
+      };
+    }
+
+    const keyInput = overlay.querySelector("#aiConnKeyInput");
+    const saveBtn = overlay.querySelector("#aiConnSaveBtn");
+    const clearBtn = overlay.querySelector("#aiConnClearBtn");
+
+    if (keyInput) {
+      keyInput.onkeydown = (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          if (saveBtn) saveBtn.click();
+        }
+      };
+    }
+
+    // Save Key to MongoDB
+    if (saveBtn) {
+      saveBtn.onclick = async () => {
+        const inputEl = overlay.querySelector("#aiConnKeyInput");
+        const val = (inputEl ? inputEl.value : "").trim();
+        if (!val) {
+          showToast(`Please enter an API key for ${meta.name}`, "info");
+          if (inputEl) inputEl.focus();
+          return;
+        }
+        if (val.includes("•") || val.includes("...")) {
+          showToast("Please enter your actual raw API key, not a masked placeholder.", "error");
+          if (inputEl) inputEl.focus();
+          return;
+        }
+
+        saveBtn.disabled = true;
+        saveBtn.textContent = "Saving...";
+        try {
+          const res = await api("/ai/keys", {
+            method: "POST",
+            body: JSON.stringify({ provider: currentTab, api_key: val })
+          });
+          if (res && res.success) {
+            if (!aiMongoKeysCache.configured) aiMongoKeysCache.configured = {};
+            if (!aiMongoKeysCache.masked_keys) aiMongoKeysCache.masked_keys = {};
+            aiMongoKeysCache.configured[currentTab] = true;
+            aiMongoKeysCache.masked_keys[currentTab] = res.masked_key;
+            // Also make this provider the active provider
+            localStorage.setItem("clove_ai_provider", currentTab);
+            showToast(`🔒 ${meta.name} API key encrypted and saved in MongoDB!`, "success");
+            renderConnectorUI();
+            if (typeof onUpdatedCallback === "function") {
+              onUpdatedCallback(currentTab, aiMongoKeysCache);
+            }
+          } else {
+            showToast(res.message || "Failed to save API key", "error");
+          }
+        } catch (err) {
+          showToast(err.message || "Failed to save key to MongoDB", "error");
+        } finally {
+          saveBtn.disabled = false;
+          saveBtn.textContent = "Save Key";
+        }
+      };
+    }
+
+    // Clear Key from MongoDB
+    if (clearBtn) {
+      clearBtn.onclick = async () => {
+        const inputEl = overlay.querySelector("#aiConnKeyInput");
+        if (!isConfigured && (!inputEl || !inputEl.value)) {
+          showToast("No key configured to clear.", "info");
+          return;
+        }
+        clearBtn.disabled = true;
+        try {
+          await api(`/ai/keys?provider=${currentTab}`, { method: "DELETE" });
+          if (aiMongoKeysCache.configured) aiMongoKeysCache.configured[currentTab] = false;
+          if (aiMongoKeysCache.masked_keys) aiMongoKeysCache.masked_keys[currentTab] = "";
+          showToast(`${meta.name} API key wiped from MongoDB vault`, "info");
+          renderConnectorUI();
+          if (typeof onUpdatedCallback === "function") {
+            onUpdatedCallback(currentTab, aiMongoKeysCache);
+          }
+        } catch (err) {
+          showToast(err.message || "Failed to clear key", "error");
+        } finally {
+          clearBtn.disabled = false;
+        }
+      };
+    }
+  };
+
+  document.body.appendChild(overlay);
+  renderConnectorUI();
+
+  // Fetch latest key status from backend
+  fetchAiKeysStatus().then(() => renderConnectorUI());
+}
+
+
+// ================= Complete AI Copilot Chat Interface =================
+function openAiCopilotModal() {
+  closeAllDropdowns();
+
+  // Wipe any legacy keys from browser localStorage
+  ["gemini", "deepseek", "openai", "claude"].forEach(p => localStorage.removeItem("clove_ai_key_" + p));
+  localStorage.removeItem("clove_vault_seed");
+
+  let currentProvider = localStorage.getItem("clove_ai_provider") || "deepseek";
+  if (!AI_PROVIDERS[currentProvider]) currentProvider = "deepseek";
+
+  const curProj = activeProjectId ? findProject(activeProjectId) : null;
+  const curProjKey = curProj ? curProj.key : "";
+
+  const promptSuggestions = [
+    {
+      label: "🚀 Full Sprint",
+      text: "Create project Mobile Banking with key BANK and sprint tasks:\n• Setup OAuth2 Authentication (priority High)\n• Design Dashboard UI with Balance widgets (priority Medium)\n• Implement Real-time Transaction Push (priority High)\n• Security Audit & Pentest checklist (priority Critical)"
+    },
+    {
+      label: "✨ 3 Tasks",
+      text: curProjKey 
+        ? `Create 3 tasks in project ${curProjKey}:\n• Add Dark Mode toggle animation (priority Medium)\n• Export Sprint Reports to CSV (priority Low)\n• Webhook notifications for task updates (priority High)`
+        : "Create 3 sprint tasks:\n• Add Dark Mode toggle animation (priority Medium)\n• Export Sprint Reports to CSV (priority Low)\n• Webhook notifications for task updates (priority High)"
+    },
+    {
+      label: "🐞 Urgent Bug",
+      text: curProjKey
+        ? `Create task 'Fix session timeout issue on payment checkout' in project ${curProjKey} priority Critical`
+        : "Create task 'Fix session timeout issue on payment checkout' priority Critical"
+    },
+    {
+      label: "⚡ Mark Done",
+      text: curProjKey ? `Move ${curProjKey}-1 to Done` : "Move TSK-1 to Done"
+    }
+  ];
+
+  document.body.classList.add("ai-panel-open");
+
+  byId("modal-root").innerHTML = `
+    <div class="ai-side-panel-overlay" id="aiCopilotOverlay">
+      <div class="ai-side-panel-backdrop" id="aiPanelBackdrop" title="Click outside to close"></div>
+      <div class="ai-side-panel" id="aiSidePanel">
+        <!-- AI Chat Header -->
+        <div class="modal-ai-head">
+          <div class="modal-ai-title-wrap">
+            <h2><img src="image/files/microphone_icon_orange.svg" class="ai-head-clove-icon" alt=""> Clovia</h2>
+            <button type="button" class="ai-active-engine-badge" id="aiActiveEngineBadge" title="Current Engine. Click to open Connector">
+              <span class="ai-active-dot" id="aiActiveDot"></span>
+              <span id="aiActiveEngineName">${AI_PROVIDERS[currentProvider].name}</span>
+            </button>
+          </div>
+          <div class="ai-head-actions">
+            <button type="button" class="ai-connector-trigger-btn" id="aiOpenConnectorBtn" title="AI Connector • Configure API Keys">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 22v-5"/>
+                <path d="M9 8V2"/>
+                <path d="M15 8V2"/>
+                <path d="M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8Z"/>
+              </svg>
+              <span>Connector</span>
+            </button>
+            <button type="button" class="ai-head-icon-btn" id="aiClearChatBtn" title="Clear chat history">
+              <img src="image/trash.svg" class="app-icon" style="width:14px;height:14px;" alt="Clear">
+            </button>
+            <button type="button" class="close" id="aiPanelCloseBtn" title="Close Side Panel">
+              <img src="image/close.svg" class="app-icon" alt="Close">
+            </button>
+          </div>
+        </div>
+
+        <!-- AI Chat Stream Area -->
+        <div class="ai-chat-stream" id="aiChatStream"></div>
+
+        <!-- Bottom Chat Input Bar -->
+        <div class="ai-chat-input-bar">
+          <div class="ai-input-pill">
+            <textarea class="ai-chat-textarea" id="aiChatInput" rows="1" placeholder="Ask Clovia to create tasks, projects, or update statuses..."></textarea>
+            <button type="button" class="ai-send-btn" id="aiChatSendBtn" title="Send message" disabled>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="22" y1="2" x2="11" y2="13"></line>
+                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Close Side Panel with Smooth Slide
+  const closeAiPanel = () => {
+    document.body.classList.remove("ai-panel-open");
+    const overlay = byId("aiCopilotOverlay");
+    if (!overlay) {
+      closeModal();
+      return;
+    }
+    const panel = byId("aiSidePanel");
+    if (panel) {
+      panel.style.animation = "aiPanelSlideOut 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards";
+      overlay.style.animation = "modalFadeOut 0.22s ease-out forwards";
+      setTimeout(() => closeModal(), 200);
+    } else {
+      closeModal();
+    }
+  };
+
+  const closeBtn = byId("aiPanelCloseBtn");
+  if (closeBtn) closeBtn.onclick = closeAiPanel;
+
+  const backdrop = byId("aiPanelBackdrop");
+  if (backdrop) backdrop.onclick = closeAiPanel;
+
+  // Header Engine & Connector Button Handlers
+  const updateEngineBadge = () => {
+    currentProvider = localStorage.getItem("clove_ai_provider") || "deepseek";
+    if (!AI_PROVIDERS[currentProvider]) currentProvider = "deepseek";
+
+    const nameEl = byId("aiActiveEngineName");
+    const dotEl = byId("aiActiveDot");
+    if (nameEl) nameEl.textContent = AI_PROVIDERS[currentProvider].name;
+
+    const hasKey = Boolean(aiMongoKeysCache.configured && aiMongoKeysCache.configured[currentProvider]);
+    if (dotEl) {
+      dotEl.className = hasKey ? "ai-active-dot" : "ai-active-dot disconnected";
+      dotEl.title = hasKey ? "Connected in MongoDB" : "No key configured";
+    }
+  };
+
+  const openConnectorHandler = () => {
+    openAiConnectorModal((newProvider, keysState) => {
+      aiMongoKeysCache = keysState;
+      currentProvider = newProvider;
+      updateEngineBadge();
+      renderChatStream();
+    });
+  };
+
+  const connectorBtn = byId("aiOpenConnectorBtn");
+  if (connectorBtn) connectorBtn.onclick = openConnectorHandler;
+
+  const engineBadge = byId("aiActiveEngineBadge");
+  if (engineBadge) engineBadge.onclick = openConnectorHandler;
+
+  // Clear Chat History
+  const clearChatBtn = byId("aiClearChatBtn");
+  if (clearChatBtn) {
+    clearChatBtn.onclick = () => {
+      aiChatMessages = [];
+      window._cloveAiChatMessages = [];
+      renderChatStream();
+      showToast("Chat cleared", "info");
+    };
+  }
+
+  // Render Chat Stream Messages
+  const streamEl = byId("aiChatStream");
+  const renderChatStream = () => {
+    if (!streamEl) return;
+
+    if (aiChatMessages.length === 0) {
+      const userName = (currentUser && currentUser.name) ? currentUser.name.trim().split(" ")[0] : "";
+      const welcomeHeading = userName ? `Welcome ${esc(userName)}, this is Clovia` : "Welcome, this is Clovia";
+      streamEl.innerHTML = `
+        <div class="clovia-simple-welcome">
+          <img src="image/files/microphone_icon_orange.svg" class="clovia-simple-icon" alt="Clovia">
+          <h2>${welcomeHeading}</h2>
+          <p>How can I help you today?</p>
+        </div>
+      `;
+      return;
+    }
+
+    // Render message thread
+    let html = "";
+    aiChatMessages.forEach(msg => {
+      if (msg.role === "user") {
+        html += `
+          <div class="ai-msg-row user">
+            <div class="ai-bubble-user">${esc(msg.text)}</div>
+          </div>
+        `;
+      } else if (msg.role === "assistant") {
+        let actionsHtml = "";
+        if (msg.actions && msg.actions.length) {
+          actionsHtml = `
+            <div class="ai-actions-stack">
+              ${msg.actions.map(act => {
+                if (act.type === "project_created") {
+                  return `
+                    <div class="ai-action-card">
+                      <div class="ai-card-left">
+                        <span class="ai-card-badge">PROJECT</span>
+                        <span class="ai-card-title">${esc(act.name)} (${esc(act.key)})</span>
+                      </div>
+                      <button type="button" class="ai-jump-btn" data-jump-project="${act.id}">Open Board ➔</button>
+                    </div>
+                  `;
+                } else if (act.type === "task_created") {
+                  return `
+                    <div class="ai-action-card">
+                      <div class="ai-card-left">
+                        <span class="ai-card-badge">${esc(act.key)}</span>
+                        <span class="ai-card-title">${esc(act.title)}</span>
+                      </div>
+                      <div class="ai-card-meta">
+                        ${act.issue_type ? `<span class="pill" style="font-size:10px;font-weight:700;">${esc(act.issue_type)}</span>` : ""}
+                        <span class="pill">${esc(act.priority || "Medium")}</span>
+                        ${act.assignee ? `<span class="pill" style="color:var(--primary);">${esc(act.assignee)}</span>` : ""}
+                      </div>
+                    </div>
+                  `;
+                } else if (act.type === "task_status_updated") {
+                  return `
+                    <div class="ai-action-card">
+                      <div class="ai-card-left">
+                        <span class="ai-card-badge">${esc(act.key)}</span>
+                        <span>Moved to <strong>${esc(act.new_status)}</strong></span>
+                      </div>
+                      <span style="color:#10B981;font-weight:700;">✓ Done</span>
+                    </div>
+                  `;
+                } else if (act.type === "task_assigned") {
+                  return `
+                    <div class="ai-action-card">
+                      <div class="ai-card-left">
+                        <span class="ai-card-badge">${esc(act.key)}</span>
+                        <span>Assigned to <strong>${esc(act.assignee)}</strong></span>
+                      </div>
+                    </div>
+                  `;
+                }
+                return "";
+              }).join("")}
+            </div>
+          `;
+        }
+
+        html += `
+          <div class="ai-msg-row assistant">
+            <div class="ai-assistant-avatar"><img src="image/files/microphone_icon_orange.svg" alt="Clovia"></div>
+            <div class="ai-assistant-body">
+              <div class="ai-bubble-assistant">
+                ${msg.error ? `<span style="color:#EF4444;font-weight:700;">⚠️ Error: </span>` : ''}
+                ${esc(msg.summary || msg.text || "")}
+              </div>
+              ${actionsHtml}
+            </div>
+          </div>
+        `;
+      }
+    });
+
+    streamEl.innerHTML = html;
+
+    // Attach listeners to jump buttons
+    streamEl.querySelectorAll("[data-jump-project]").forEach(btn => {
+      btn.onclick = () => {
+        closeAiPanel();
+        openProject(btn.dataset.jumpProject);
+      };
+    });
+
+    // Scroll to bottom
+    streamEl.scrollTop = streamEl.scrollHeight;
+  };
+
+  // Auto-resize chat textarea
+  const autoResizeTextarea = (el) => {
+    el.style.height = "auto";
+    const scrollH = el.scrollHeight;
+    if (scrollH <= 32) {
+      el.style.height = "24px";
+      el.style.overflowY = "hidden";
+    } else {
+      el.style.height = Math.min(scrollH, 110) + "px";
+      el.style.overflowY = scrollH > 110 ? "auto" : "hidden";
+    }
+  };
+
+  const chatInput = byId("aiChatInput");
+  const sendBtn = byId("aiChatSendBtn");
+
+  if (chatInput && sendBtn) {
+    chatInput.oninput = () => {
+      autoResizeTextarea(chatInput);
+      sendBtn.disabled = !chatInput.value.trim();
+    };
+
+    chatInput.onkeydown = (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        if (!sendBtn.disabled) {
+          sendMessage();
+        }
+      }
+    };
+
+    sendBtn.onclick = () => sendMessage();
+  }
+
+  // Sending message logic
+  const sendMessage = async (presetPrompt = null) => {
+    if (!chatInput) return;
+    const prompt = (presetPrompt !== null && typeof presetPrompt === "string" ? presetPrompt : chatInput.value).trim();
+    if (!prompt) return;
+
+    // Add user message
+    aiChatMessages.push({ role: "user", text: prompt, time: Date.now() });
+    window._cloveAiChatMessages = aiChatMessages;
+    chatInput.value = "";
+    chatInput.style.height = "24px";
+    chatInput.style.overflowY = "hidden";
+    if (sendBtn) sendBtn.disabled = true;
+
+    renderChatStream();
+
+    // Show Typing Indicator
+    const typingRow = document.createElement("div");
+    typingRow.className = "ai-msg-row assistant";
+    typingRow.id = "aiTypingIndicator";
+    typingRow.innerHTML = `
+      <div class="ai-assistant-avatar"><img src="image/files/microphone_icon_orange.svg" alt="Clovia"></div>
+      <div class="ai-typing-indicator">
+        <div class="ai-typing-dots">
+          <span></span><span></span><span></span>
+        </div>
+        <span class="ai-typing-label">Thinking with ${esc(AI_PROVIDERS[currentProvider].name)}...</span>
+      </div>
+    `;
+    streamEl.appendChild(typingRow);
+    streamEl.scrollTop = streamEl.scrollHeight;
+
+    try {
+      const resp = await api("/ai/command", {
+        method: "POST",
+        body: JSON.stringify({
+          prompt: prompt,
+          current_project_id: activeProjectId || null,
+          provider: currentProvider
+        })
+      });
+
+      // Remove typing indicator
+      const existingTyping = byId("aiTypingIndicator");
+      if (existingTyping) existingTyping.remove();
+
+      if (!resp.success) {
+        aiChatMessages.push({
+          role: "assistant",
+          error: true,
+          text: resp.message || "Failed to process request."
+        });
+        window._cloveAiChatMessages = aiChatMessages;
+        renderChatStream();
+        showToast(resp.message || "AI command failed", "error");
+        return;
+      }
+
+      // Refresh workspace data only if actions were actually executed
+      if (resp.actions_executed && resp.actions_executed.length > 0) {
+        await loadInitialData();
+        if (activeProjectId) {
+          await openProject(activeProjectId);
+        }
+      }
+
+      // Add assistant response
+      aiChatMessages.push({
+        role: "assistant",
+        summary: resp.summary,
+        actions: resp.actions_executed || [],
+        engine: resp.engine || AI_PROVIDERS[currentProvider].name
+      });
+      window._cloveAiChatMessages = aiChatMessages;
+      renderChatStream();
+
+      // Only show execution toast when project/tasks were actually created or updated
+      if (resp.actions_executed && resp.actions_executed.length > 0) {
+        showToast(resp.summary || "AI Plan executed successfully!", "success");
+      }
+
+    } catch (err) {
+      const existingTyping = byId("aiTypingIndicator");
+      if (existingTyping) existingTyping.remove();
+
+      aiChatMessages.push({
+        role: "assistant",
+        error: true,
+        text: err.message || "Failed to connect to AI engine."
+      });
+      window._cloveAiChatMessages = aiChatMessages;
+      renderChatStream();
+      showToast(err.message || "Failed to run AI command", "error");
+    } finally {
+      if (chatInput) chatInput.focus();
+    }
+  };
+
+  // Initial load of keys status and render
+  fetchAiKeysStatus().then(() => {
+    updateEngineBadge();
+    renderChatStream();
+  });
+
+  renderChatStream();
+  if (chatInput) setTimeout(() => chatInput.focus(), 150);
+}
+
+
+// Global shortcut Ctrl+J / Cmd+J for AI Copilot
+window.addEventListener("keydown", (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "j") {
+    e.preventDefault();
+    openAiCopilotModal();
+  }
+});
+
 // ================= Project / Task modals =================
 
 function openProjectModal(existingProject = null) {
@@ -4779,6 +5504,7 @@ function openUserManualModal(initialTab = "quickstart") {
 }
 
 function closeModal() {
+  document.body.classList.remove("ai-panel-open");
   activeModalIssueId = null;
   if (modalCommentTimer) {
     clearInterval(modalCommentTimer);
@@ -4872,6 +5598,15 @@ const TOUR_STEPS = [
     desc: "Access complete workflows, keyboard shortcuts, and feature guides anytime in the user documentation.",
     badge: "Sidebar • Help",
     placement: "right"
+  },
+
+  // --- PART 3: Clovia AI Assistant ---
+  {
+    target: "#aiFloatingBtn",
+    title: "Clovia • AI Workspace Assistant",
+    desc: "Your intelligent workspace copilot. Press Ctrl+J or click this button to scaffold projects, create sprint tasks, update Kanban statuses, and assign teammates using natural language.",
+    badge: "AI Copilot • Clovia",
+    placement: "top"
   }
 ];
 
@@ -4958,6 +5693,11 @@ function updateTourPosition() {
       left = Math.max(16, winW - cardWidth - 16);
       top = Math.max(16, rect.top - cardHeight - 12);
     }
+  } else if (step.placement === "top") {
+    top = rect.top - cardHeight - 14;
+    left = rect.right - cardWidth;
+    if (top < 16) top = 16;
+    if (left < 16) left = 16;
   } else {
     // Bottom placement
     top = rect.bottom + 12;
@@ -5079,3 +5819,23 @@ function startOnboardingTour(stepIndex = 0) {
 
 shell();
 loadInitialData();
+ensureAiFloatingBtn();
+
+// Keyboard shortcut Ctrl+J / Cmd+J to toggle AI Copilot
+document.addEventListener("keydown", (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "j") {
+    e.preventDefault();
+    const existingOverlay = byId("aiCopilotOverlay");
+    if (existingOverlay) {
+      closeModal();
+    } else {
+      openAiCopilotModal();
+    }
+  }
+});
+
+// Auto-open AI Copilot if requested via URL param (e.g. from manual.html)
+if (urlParams.get("open_ai") === "1" || urlParams.get("ai") === "1") {
+  setTimeout(() => openAiCopilotModal(), 350);
+}
+

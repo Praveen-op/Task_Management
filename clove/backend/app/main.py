@@ -6,7 +6,7 @@ from bson import ObjectId
 from .database import client, users_collection, projects_collection, issues_collection
 from .security import decode_token
 from .websocket_manager import ws_manager
-from .routes import auth, users, projects, issues, comments, notifications, search, invitations
+from .routes import auth, users, projects, issues, comments, notifications, search, invitations, ai
 
 app = FastAPI(title="CLOVE API", version="1.0.0", docs_url=None)
 
@@ -54,6 +54,7 @@ app.include_router(comments.router)
 app.include_router(notifications.router)
 app.include_router(search.router)
 app.include_router(invitations.router)
+app.include_router(ai.router)
 
 @app.websocket("/ws/projects/{project_id}")
 async def websocket_project_sync(websocket: WebSocket, project_id: str, token: str = ""):
